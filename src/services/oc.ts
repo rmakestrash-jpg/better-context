@@ -1,12 +1,108 @@
-import { createOpencode } from "@opencode-ai/sdk";
-import { Duration, Effect } from "effect";
+import {
+  createOpencode,
+  type OpencodeClient,
+  type Event,
+} from "@opencode-ai/sdk";
+import { Deferred, Effect, Stream } from "effect";
 import { TaggedError } from "effect/Data";
-import { ConfigService } from "./config";
+import { ConfigService } from "./config.ts";
 
 class OcError extends TaggedError("OcError")<{
   readonly message: string;
   readonly cause?: unknown;
 }> {}
+
+export type { Event as OcEvent };
+
+const streamSessionEvents = (client: OpencodeClient, sessionID: string) =>
+  Effect.gen(function* () {
+    const events = yield* Effect.tryPromise({
+      try: () => client.event.subscribe(),
+      catch: (err) =>
+        new OcError({ message: "Failed to subscribe to events", cause: err }),
+    });
+
+    return Stream.fromAsyncIterable(
+      events.stream,
+      (e) => new OcError({ message: "Event stream error", cause: e })
+    ).pipe(
+      Stream.filter((event) => {
+        const props = event.properties as {
+          sessionID?: string;
+          part?: { sessionID?: string };
+        };
+        return (
+          props.sessionID === sessionID || props.part?.sessionID === sessionID
+        );
+      }),
+      Stream.takeUntil(
+        (event) =>
+          event.type === "session.idle" &&
+          event.properties.sessionID === sessionID
+      )
+    );
+  });
+
+const firePrompt = (
+  client: OpencodeClient,
+  sessionID: string,
+  text: string,
+  errorDeferred: Deferred.Deferred<never, OcError>
+) =>
+  Effect.promise(() =>
+    client.session.prompt({
+      path: { id: sessionID },
+      body: {
+        agent: "docs",
+        model: {
+          providerID: "opencode",
+          modelID: "claude-haiku-4-5",
+        },
+        parts: [{ type: "text", text }],
+      },
+    })
+  ).pipe(
+    Effect.catchAll((err) =>
+      Deferred.fail(
+        errorDeferred,
+        new OcError({ message: String(err), cause: err })
+      )
+    )
+  );
+
+const streamPrompt = (
+  client: OpencodeClient,
+  sessionID: string,
+  prompt: string
+): Effect.Effect<Stream.Stream<Event, OcError>, OcError> =>
+  Effect.gen(function* () {
+    const eventStream = yield* streamSessionEvents(client, sessionID);
+
+    const errorDeferred = yield* Deferred.make<never, OcError>();
+
+    yield* firePrompt(client, sessionID, prompt, errorDeferred).pipe(
+      Effect.forkDaemon
+    );
+
+    // Transform stream to fail on session.error, race with prompt error
+    return eventStream.pipe(
+      Stream.mapEffect((event) =>
+        Effect.gen(function* () {
+          if (event.type === "session.error") {
+            const props = event.properties as { error?: { name?: string } };
+            return yield* Effect.fail(
+              new OcError({
+                message: props.error?.name ?? "Unknown session error",
+                cause: props.error,
+              })
+            );
+          }
+          return event;
+        })
+      ),
+      Stream.interruptWhen(Deferred.await(errorDeferred))
+    );
+  });
 
 const ocService = Effect.gen(function* () {
   const config = yield* ConfigService;
@@ -44,40 +140,10 @@ const ocService = Effect.gen(function* () {
           );
         }
 
+        const sessionID = session.data.id;
         yield* Effect.log(`PROMPTING WITH: ${prompt}`);
 
-        const resp = yield* Effect.promise(() =>
-          client.session.prompt({
-            path: { id: session.data.id },
-            body: {
-              agent: "docs",
-              model: {
-                providerID: "opencode",
-                modelID: "claude-haiku-4-5",
-              },
-              parts: [{ type: "text", text: prompt }],
-            },
-          })
-        );
-
-        if (resp.error) {
-          return yield* Effect.fail(
-            new OcError({
-              message: "FAILED TO TEST PROMPTING",
-              cause: resp.error,
-            })
-          );
-        }
-
-        resp.data.parts.forEach((part) => {
-          if (part.type === "text") {
-            console.log(part.text);
-          }
-        });
-
-        console.log("\n--- PROMPT COMPLETE ---");
-
-        return null;
+        return yield* streamPrompt(client, sessionID, prompt);
       }),
   };
 });
