@@ -1,30 +1,54 @@
 {
-  "name": "@davis7/the-better-context-app",
+  "name": "btca",
   "author": "Ben Davis",
-  "version": "0.0.1",
-  "module": "index.ts",
+  "version": "0.0.5",
+  "description": "CLI tool for asking questions about technologies using OpenCode",
   "type": "module",
-  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bmdavis419/better-context"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "docs"
+  ],
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "bin": {
+    "btca": "./bin.js"
+  },
+  "files": [
+    "bin.js",
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "bun run src",
-    "build": "bun build src/index.ts --outdir dist",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "build:targets": "bun run scripts/build-binaries.ts",
+    "build:artifacts": "bun run build && bun run build:targets",
+    "prepublishOnly": "bun run build:artifacts",
     "start": "bun dist/index.js",
     "typecheck": "tsc --noEmit",
     "prepare": "effect-language-service patch"
   },
   "devDependencies": {
-    "@effect/language-service": "^0.57.1",
-    "@types/bun": "latest",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
     "@effect/cli": "^0.72.1",
+    "@effect/language-service": "^0.57.1",
     "@effect/platform": "^0.93.5",
     "@effect/platform-bun": "^0.85.0",
     "@effect/printer": "^0.47.0",
     "@effect/printer-ansi": "^0.47.0",
     "@effect/typeclass": "^0.38.0",
     "@opencode-ai/sdk": "^1.0.119",
-    "effect": "^3.19.8"
+    "@types/bun": "latest",
+    "effect": "^3.19.8",
+    "typescript": "^5.9.3"
   }
 }

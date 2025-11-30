@@ -100,7 +100,7 @@ const configService = Effect.gen(function* () {
             description:
               "Get answers about libraries and frameworks by searching their source code",
             permission: {
-              webfetch: "allow",
+              webfetch: "deny",
               edit: "deny",
               bash: "allow",
               external_directory: "allow",
@@ -118,7 +118,7 @@ const configService = Effect.gen(function* () {
               path: false,
               todowrite: false,
               todoread: false,
-              websearch: true,
+              websearch: false,
             },
           },
         },
