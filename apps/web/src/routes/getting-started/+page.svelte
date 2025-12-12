@@ -5,9 +5,8 @@
 
 	const INSTALL_CMD = `bun add -g btca
 btca`;
-
 	const DEFAULT_REPOS = [
-		{
+		 {
 			name: 'svelte',
 			url: 'https://github.com/sveltejs/svelte.dev',
 			branch: 'main'
