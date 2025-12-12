@@ -1,6 +1,7 @@
 <script lang="ts">
 	import CopyButton from '$lib/CopyButton.svelte';
 	import { getShikiStore } from '$lib/stores/ShikiStore.svelte';
+	import { getThemeStore } from '$lib/stores/ThemeStore.svelte';
 
 	const INSTALL_CMD = `bun add -g btca
 btca`;
@@ -11,6 +12,8 @@ btca`;
 	const OPEN_CMD = `btca open`;
 
 	const shikiStore = getShikiStore();
+	const themeStore = getThemeStore();
+	const shikiTheme = $derived(themeStore.theme === 'dark' ? 'dark-plus' : 'light-plus');
 </script>
 
 <section class="flex flex-col gap-10">
@@ -72,7 +75,7 @@ btca`;
 			<div class="min-w-0 flex-1 overflow-x-auto">
 				{#if shikiStore.highlighter}
 					{@html shikiStore.highlighter.codeToHtml(INSTALL_CMD, {
-						theme: 'dark-plus',
+						theme: shikiTheme,
 						lang: 'bash',
 						rootStyle: 'background-color: transparent; padding: 0; margin: 0; height: 100%;'
 					})}
@@ -113,7 +116,7 @@ btca`;
 						<div class="min-w-0 flex-1 overflow-x-auto">
 							{#if shikiStore.highlighter}
 								{@html shikiStore.highlighter.codeToHtml(ASK_CMD, {
-									theme: 'dark-plus',
+									theme: shikiTheme,
 									lang: 'bash',
 									rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 								})}
@@ -139,7 +142,7 @@ btca`;
 						<div class="min-w-0 flex-1 overflow-x-auto">
 							{#if shikiStore.highlighter}
 								{@html shikiStore.highlighter.codeToHtml(CHAT_CMD, {
-									theme: 'dark-plus',
+									theme: shikiTheme,
 									lang: 'bash',
 									rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 								})}
@@ -167,7 +170,7 @@ btca`;
 						<div class="min-w-0 flex-1 overflow-x-auto">
 							{#if shikiStore.highlighter}
 								{@html shikiStore.highlighter.codeToHtml(SERVE_CMD, {
-									theme: 'dark-plus',
+									theme: shikiTheme,
 									lang: 'bash',
 									rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 								})}
@@ -204,7 +207,7 @@ btca`;
 						<div class="min-w-0 flex-1 overflow-x-auto">
 							{#if shikiStore.highlighter}
 								{@html shikiStore.highlighter.codeToHtml(OPEN_CMD, {
-									theme: 'dark-plus',
+									theme: shikiTheme,
 									lang: 'bash',
 									rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 								})}

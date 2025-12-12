@@ -2,29 +2,22 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import ogImage from '$lib/assets/og.png';
-	import { getInitialTheme, setTheme, type Theme } from '$lib/theme';
 	import { Bot, Github, Moon, Sun } from '@lucide/svelte';
-	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { setShikiStore } from '$lib/stores/ShikiStore.svelte';
+	import { setThemeStore } from '$lib/stores/ThemeStore.svelte';
 
 	let { children } = $props();
 
-	let theme = $state<Theme>('dark');
 	const fullBleed = $derived(page.url.pathname === '/og');
 	const ogImageUrl = $derived(new URL(ogImage, page.url).href);
 
 	setShikiStore();
+	const themeStore = setThemeStore();
 
 	const toggleTheme = () => {
-		theme = theme === 'dark' ? 'light' : 'dark';
-		setTheme(theme);
+		themeStore.toggle();
 	};
-
-	onMount(() => {
-		theme = getInitialTheme();
-		setTheme(theme);
-	});
 </script>
 
 <svelte:head>
@@ -96,9 +89,9 @@
 					class="inline-flex items-center justify-center rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-900 shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-50 dark:hover:bg-neutral-900"
 					onclick={toggleTheme}
 					aria-label="Toggle theme"
-					title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+					title={themeStore.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
 				>
-					{#if theme === 'dark'}
+					{#if themeStore.theme === 'dark'}
 						<Sun size={18} strokeWidth={2.25} />
 					{:else}
 						<Moon size={18} strokeWidth={2.25} />
