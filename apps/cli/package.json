@@ -1,7 +1,7 @@
 {
 	"name": "btca",
 	"author": "Ben Davis",
-	"version": "0.5.3",
+	"version": "0.5.4",
 	"description": "CLI tool for asking questions about technologies using OpenCode",
 	"type": "module",
 	"license": "MIT",
@@ -18,11 +18,15 @@
 		"bun": ">=1.1.0"
 	},
 	"bin": {
-		"btca": "./bin.js"
+		"btca": "bin.js"
 	},
 	"files": [
 		"bin.js",
-		"dist"
+		"dist/btca-darwin-arm64",
+		"dist/btca-darwin-x64",
+		"dist/btca-linux-arm64",
+		"dist/btca-linux-x64",
+		"dist/btca-windows-x64.exe"
 	],
 	"publishConfig": {
 		"access": "public"
