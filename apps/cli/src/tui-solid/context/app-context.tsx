@@ -2,6 +2,7 @@
 // selected model
 // message history for current thread (for now these are just in memory)
 
+import type { InputRenderable } from '@opentui/core';
 import { createContext, createSignal, useContext, type Accessor, type JSX } from 'solid-js';
 import { createStore } from 'solid-js/store';
 
@@ -13,7 +14,7 @@ type InputState = {
 type Message =
 	| {
 			role: 'user';
-			content: string;
+			content: InputState;
 	  }
 	| {
 			role: 'assistant';
@@ -33,9 +34,11 @@ type AppState = {
 	selectedProvider: Accessor<string>;
 	setModel: (model: string) => void;
 	setProvider: (provider: string) => void;
-	messageHistory: Message[];
+	messageHistory: Accessor<Message[]>;
 	addMessage: (message: Message) => void;
 	clearMessages: () => void;
+	inputRef: Accessor<InputRenderable | null>;
+	setInputRef: (ref: InputRenderable | null) => void;
 };
 
 const defaultMessageHistory: Message[] = [
@@ -62,15 +65,17 @@ export const AppProvider = (props: { children: JSX.Element }) => {
 	// TODO: get these from the actual core process
 	const [selectedModel, setSelectedModel] = createSignal('claude-haiku-4-5');
 	const [selectedProvider, setSelectedProvider] = createSignal('anthropic');
-	const [messageStore, setMessageStore] = createStore<{ messages: Message[] }>({
-		messages: defaultMessageHistory
-	});
+	const [messageHistory, setMessageHistory] = createSignal<Message[]>(defaultMessageHistory);
 	const [cursorPosition, setCursorPosition] = createSignal(0);
 
 	const [inputStore, setInputStore] = createSignal<InputState>([]);
 
+	const [inputRef, setInputRef] = createSignal<InputRenderable | null>(null);
+
 	const state: AppState = {
 		inputState: inputStore,
+		inputRef,
+		setInputRef,
 		setCursorPosition,
 		cursorIsCurrentlyIn: () => {
 			let curIdx = 0;
@@ -87,14 +92,14 @@ export const AppProvider = (props: { children: JSX.Element }) => {
 		setInputState: setInputStore,
 		selectedModel,
 		selectedProvider,
-		messageHistory: messageStore.messages,
+		messageHistory,
 		setModel: setSelectedModel,
 		setProvider: setSelectedProvider,
 		addMessage: (message: Message) => {
-			setMessageStore('messages', (prev) => [...prev, message]);
+			setMessageHistory((prev) => [...prev, message]);
 		},
 		clearMessages: () => {
-			setMessageStore('messages', defaultMessageHistory);
+			setMessageHistory(defaultMessageHistory);
 		}
 	};
 

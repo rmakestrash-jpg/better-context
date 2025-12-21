@@ -1,4 +1,4 @@
-import { createEffect, createSignal, type Component, type JSX } from 'solid-js';
+import { createSignal, type Component, type JSX } from 'solid-js';
 import { AppProvider } from './context/app-context';
 import { render, useKeyboard, useRenderer } from '@opentui/solid';
 import { MainUi } from '.';
@@ -25,10 +25,6 @@ const App: Component = () => {
 
 	const [heightPercent, setHeightPercent] = createSignal<`${number}%`>('100%');
 
-	createEffect(() => {
-		console.log(appState.cursorIsCurrentlyIn());
-	});
-
 	useKeyboard((key) => {
 		if (key.name === 'c' && key.ctrl) {
 			if (appState.inputState().length > 0) {
@@ -45,6 +41,13 @@ const App: Component = () => {
 				setHeightPercent('100%');
 				renderer.console.hide();
 			}
+		}
+		if (key.name === 'return' && appState.cursorIsCurrentlyIn() === 'text') {
+			appState.addMessage({
+				role: 'user',
+				content: appState.inputState()
+			});
+			appState.setInputState([]);
 		}
 	});
 

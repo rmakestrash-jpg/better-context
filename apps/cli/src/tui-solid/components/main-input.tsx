@@ -1,12 +1,9 @@
-import { createEffect, For, Show, type Component } from 'solid-js';
+import { For, Show, type Component } from 'solid-js';
 import { colors } from '../theme';
-import type { InputRenderable } from '@opentui/core';
 import { useAppContext } from '../context/app-context';
-import { useKeyboard } from '@opentui/solid';
 
 export const MainInput: Component = () => {
 	const appState = useAppContext();
-	let inputRef: InputRenderable;
 
 	const getValue = () =>
 		appState
@@ -101,14 +98,18 @@ export const MainInput: Component = () => {
 				}}
 				onKeyDown={() => {
 					queueMicrotask(() => {
+						const inputRef = appState.inputRef();
+						if (!inputRef) return;
 						appState.setCursorPosition(inputRef.cursorPosition);
 					});
 				}}
 				value={getValue()}
 				focused={true}
-				ref={(r) => (inputRef = r)}
+				ref={(r) => appState.setInputRef(r)}
 				onMouseDown={(e) => {
-					if (inputRef) inputRef.cursorPosition = e.x - 2;
+					const inputRef = appState.inputRef();
+					if (!inputRef) return;
+					inputRef.cursorPosition = e.x - 2;
 					queueMicrotask(() => {
 						appState.setCursorPosition(inputRef.cursorPosition);
 					});
