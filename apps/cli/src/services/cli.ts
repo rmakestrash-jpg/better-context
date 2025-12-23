@@ -20,14 +20,15 @@ const programLayer = Layer.mergeAll(OcService.Default, ConfigService.Default);
 // === Ask Subcommand ===
 const questionOption = Options.text('question').pipe(Options.withAlias('q'));
 const techOption = Options.text('tech').pipe(Options.withAlias('t'));
+const noSyncOption = Options.boolean('no-sync').pipe(Options.withAlias('n'));
 
 const askCommand = Command.make(
 	'ask',
-	{ question: questionOption, tech: techOption },
-	({ question, tech }) =>
+	{ question: questionOption, tech: techOption, noSync: noSyncOption },
+	({ question, tech, noSync }) =>
 		Effect.gen(function* () {
 			const oc = yield* OcService;
-			const eventStream = yield* oc.askQuestion({ tech, question, suppressLogs: false });
+			const eventStream = yield* oc.askQuestion({ tech, question, suppressLogs: false, noSync });
 
 			let currentMessageId: string | null = null;
 

@@ -262,7 +262,10 @@ const configService = Effect.gen(function* () {
 
 	return {
 		getConfigPath: () => Effect.succeed(configPath),
-		cloneOrUpdateOneRepoLocally: (repoName: string, options: { suppressLogs: boolean }) =>
+		cloneOrUpdateOneRepoLocally: (
+			repoName: string,
+			options: { suppressLogs: boolean; noSync?: boolean }
+		) =>
 			Effect.gen(function* () {
 				const repo = yield* getRepo({ repoName, config });
 				const repoDir = path.join(config.reposDirectory, repo.name);
@@ -270,14 +273,14 @@ const configService = Effect.gen(function* () {
 				const suppressLogs = options.suppressLogs;
 
 				const exists = yield* directoryExists(repoDir);
-				if (exists) {
+				if (exists && !options.noSync) {
 					if (!suppressLogs) yield* Effect.log(`Pulling latest changes for ${repo.name}...`);
 					yield* pullRepo({ repoDir, branch, quiet: suppressLogs });
-				} else {
+				} else if (!exists) {
 					if (!suppressLogs) yield* Effect.log(`Cloning ${repo.name}...`);
 					yield* cloneRepo({ repoDir, url: repo.url, branch, quiet: suppressLogs });
 				}
-				if (!suppressLogs) yield* Effect.log(`Done with ${repo.name}`);
+				if (!suppressLogs && !options.noSync) yield* Effect.log(`Done with ${repo.name}`);
 				return repo;
 			}),
 		getOpenCodeConfig: (args: { repoName: string }) =>

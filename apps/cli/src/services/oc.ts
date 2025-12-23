@@ -191,11 +191,16 @@ const ocService = Effect.gen(function* () {
 					catch: (err) => new OcError({ message: 'TUI exited with error', cause: err })
 				});
 			}),
-		askQuestion: (args: { question: string; tech: string; suppressLogs: boolean }) =>
+		askQuestion: (args: {
+			question: string;
+			tech: string;
+			suppressLogs: boolean;
+			noSync?: boolean;
+		}) =>
 			Effect.gen(function* () {
 				const { question, tech, suppressLogs } = args;
 
-				yield* config.cloneOrUpdateOneRepoLocally(tech, { suppressLogs });
+				yield* config.cloneOrUpdateOneRepoLocally(tech, { suppressLogs, noSync: args.noSync });
 
 				const { client, server } = yield* getOpencodeInstance({ tech });
 
