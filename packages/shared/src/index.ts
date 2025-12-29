@@ -23,7 +23,7 @@ export const BLESSED_MODELS: BlessedModel[] = [
 	},
 	{
 		provider: 'opencode',
-		model: 'glm-free',
+		model: 'glm-4.7-free',
 		description: 'GLM 4.7 through opencode zen',
 		providerSetupUrl: 'https://opencode.ai/docs/zen',
 		isDefault: false

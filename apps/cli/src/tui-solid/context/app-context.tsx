@@ -1,4 +1,4 @@
-import type { InputRenderable } from '@opentui/core';
+import type { TextareaRenderable } from '@opentui/core';
 import {
 	createContext,
 	createSignal,
@@ -25,8 +25,8 @@ type AppState = {
 	setCursorPosition: (position: number) => void;
 	cursorIsCurrentlyIn: Accessor<InputState[number]['type']>;
 	setInputState: (state: InputState) => void;
-	inputRef: Accessor<InputRenderable | null>;
-	setInputRef: (ref: InputRenderable | null) => void;
+	inputRef: Accessor<TextareaRenderable | null>;
+	setInputRef: (ref: TextareaRenderable | null) => void;
 
 	// Model config
 	selectedModel: Accessor<string>;
@@ -108,7 +108,7 @@ export const AppProvider: Component<ParentProps> = (props) => {
 	// Input state
 	const [cursorPosition, setCursorPosition] = createSignal(0);
 	const [inputStore, setInputStore] = createSignal<InputState>([]);
-	const [inputRef, setInputRef] = createSignal<InputRenderable | null>(null);
+	const [inputRef, setInputRef] = createSignal<TextareaRenderable | null>(null);
 
 	// Repos
 	const [repos, setReposSignal] = createSignal<Repo[]>([]);

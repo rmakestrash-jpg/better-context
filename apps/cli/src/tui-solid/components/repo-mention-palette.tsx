@@ -16,7 +16,8 @@ export const RepoMentionPalette: Component = () => {
 	const curInputIdx = () => {
 		const inputRef = appState.inputRef();
 		if (!inputRef) return 0;
-		const currentInputIndex = inputRef.cursorPosition;
+		const cursor = inputRef.logicalCursor;
+		const currentInputIndex = cursor.col; // For single-line, col is the position
 		let curIdx = 0;
 		let totalLength = 0;
 		const curInputState = appState.inputState();
@@ -69,7 +70,12 @@ export const RepoMentionPalette: Component = () => {
 				for (let i = 0; i <= idx; i++) {
 					newCursorPos += i === idx ? newContent.length : getDisplayLength(currentState[i]!);
 				}
-				inputRef.cursorPosition = newCursorPos;
+				// Calculate the new text and update textarea
+				const newText = newState
+					.map((p) => (p.type === 'pasted' ? `[~${p.lines} lines]` : p.content))
+					.join('');
+				inputRef.setText(newText);
+				inputRef.editBuffer.setCursor(0, newCursorPos);
 			}
 		}
 	};

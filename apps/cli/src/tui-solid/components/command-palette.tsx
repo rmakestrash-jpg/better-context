@@ -81,7 +81,9 @@ export const CommandPalette: Component = () => {
 					appState.setInputState([{ content: '/' + curSelectedCommand.name, type: 'command' }]);
 					const inputRef = appState.inputRef();
 					if (inputRef) {
-						inputRef.cursorPosition = curSelectedCommand.name.length + 2;
+						const newText = '/' + curSelectedCommand.name;
+						inputRef.setText(newText);
+						inputRef.editBuffer.setCursor(0, newText.length);
 					}
 				}
 				break;

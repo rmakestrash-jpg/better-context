@@ -1,11 +1,16 @@
-import { createEffect, For, Show, type Component } from 'solid-js';
-import type { KeyEvent } from '@opentui/core';
+import { createEffect, createSignal, For, Show, type Component } from 'solid-js';
+import type { KeyEvent, TextareaRenderable } from '@opentui/core';
 import { colors, getColor } from '../theme';
 import { useAppContext } from '../context/app-context';
-import { usePaste } from '@opentui/solid';
+import { usePaste, useTerminalDimensions } from '@opentui/solid';
 
 export const MainInput: Component = () => {
 	const appState = useAppContext();
+	const terminalDimensions = useTerminalDimensions();
+	let textareaRef: TextareaRenderable | null = null;
+
+	// Track the current display value for the shadow overlay
+	const [displayValue, setDisplayValue] = createSignal('');
 
 	const getPasteDisplay = (lines: number) => `[~${lines} lines]`;
 
@@ -20,6 +25,33 @@ export const MainInput: Component = () => {
 	const getPartValueLength = (p: ReturnType<typeof appState.inputState>[number]) =>
 		p.type === 'pasted' ? getPasteDisplay(p.lines).length : p.content.length;
 
+	// Calculate available width for text (accounting for border and padding)
+	const getAvailableWidth = () => {
+		const width = terminalDimensions().width;
+		// Subtract 2 for border, 2 for padding (1 each side)
+		return Math.max(1, width - 4);
+	};
+
+	// Calculate number of lines needed based on content length
+	const getLineCount = () => {
+		const value = getValue();
+		const availableWidth = getAvailableWidth();
+		if (value.length === 0) return 1;
+		return Math.max(1, Math.ceil(value.length / availableWidth));
+	};
+
+	// Get dynamic height for box (content lines + 2 for border)
+	const getBoxHeight = () => getLineCount() + 2;
+
+	// Sync input state to textarea when it changes externally (e.g., clearing input)
+	createEffect(() => {
+		const value = getValue();
+		setDisplayValue(value);
+		if (textareaRef && textareaRef.plainText !== value) {
+			textareaRef.setText(value);
+		}
+	});
+
 	usePaste((text) => {
 		if (appState.mode() !== 'chat') return;
 		const curInput = appState.inputState();
@@ -28,11 +60,14 @@ export const MainInput: Component = () => {
 		appState.setInputState(newInput);
 
 		queueMicrotask(() => {
-			const inputRef = appState.inputRef();
-			if (inputRef) {
-				const newCursorPos = newInput.reduce((acc, p) => acc + getPartValueLength(p), 0);
-				inputRef.cursorPosition = newCursorPos;
-				appState.setCursorPosition(newCursorPos);
+			if (textareaRef) {
+				const newValue = newInput
+					.map((p) => (p.type === 'pasted' ? getPasteDisplay(p.lines) : p.content))
+					.join('');
+				textareaRef.setText(newValue);
+				textareaRef.gotoBufferEnd();
+				const cursor = textareaRef.logicalCursor;
+				appState.setCursorPosition(cursor.row * getAvailableWidth() + cursor.col);
 			}
 		});
 	});
@@ -71,12 +106,14 @@ export const MainInput: Component = () => {
 		return parts;
 	}
 
-	function handleInputChange(newValue: string): ReturnType<typeof appState.inputState> {
+	function handleContentChange(newValue: string) {
+		setDisplayValue(newValue);
 		const currentParts = appState.inputState();
 		const pastedBlocks = currentParts.filter((p) => p.type === 'pasted');
 
 		if (pastedBlocks.length === 0) {
-			return parseTextSegment(newValue);
+			appState.setInputState(parseTextSegment(newValue));
+			return;
 		}
 
 		const result: ReturnType<typeof appState.inputState> = [];
@@ -103,7 +140,65 @@ export const MainInput: Component = () => {
 			result.push(...parseTextSegment(remaining));
 		}
 
-		return result;
+		appState.setInputState(result);
+	}
+
+	function handleKeyDown(event: KeyEvent) {
+		// Prevent newlines - we want single-line behavior with visual wrapping
+		if (event.name === 'return' || event.name === 'linefeed') {
+			event.preventDefault();
+			return;
+		}
+
+		if (event.name === 'backspace') {
+			if (!textareaRef) return;
+			const cursor = textareaRef.logicalCursor;
+			const curPos = cursor.col; // For single-line content, col is the position
+			const plainText = textareaRef.plainText;
+
+			// Calculate absolute cursor position
+			let absolutePos = 0;
+			const lines = plainText.split('\n');
+			for (let i = 0; i < cursor.row; i++) {
+				absolutePos += (lines[i]?.length ?? 0) + 1; // +1 for newline
+			}
+			absolutePos += cursor.col;
+
+			const parts = appState.inputState();
+
+			let offset = 0;
+			for (let i = 0; i < parts.length; i++) {
+				const part = parts[i]!;
+				const valueLen = getPartValueLength(part);
+
+				if (absolutePos <= offset + valueLen) {
+					if (part.type === 'pasted') {
+						event.preventDefault();
+						const newParts = [...parts.slice(0, i), ...parts.slice(i + 1)];
+						appState.setInputState(newParts);
+
+						// Update textarea content
+						const newValue = newParts
+							.map((p) => (p.type === 'pasted' ? getPasteDisplay(p.lines) : p.content))
+							.join('');
+						textareaRef.setText(newValue);
+
+						// Position cursor at where the pasted block was
+						textareaRef.editBuffer.setCursor(0, offset);
+						appState.setCursorPosition(offset);
+						return;
+					}
+					break;
+				}
+				offset += valueLen;
+			}
+		}
+
+		queueMicrotask(() => {
+			if (!textareaRef) return;
+			const cursor = textareaRef.logicalCursor;
+			appState.setCursorPosition(cursor.col);
+		});
 	}
 
 	return (
@@ -111,28 +206,33 @@ export const MainInput: Component = () => {
 			style={{
 				border: true,
 				borderColor: colors.accent,
-				height: 3,
+				height: getBoxHeight(),
 				width: '100%'
 			}}
 		>
-			{/* Styled text overlay - positioned on top of input */}
+			{/* Styled text overlay - positioned on top of textarea */}
 			<text
 				style={{
 					position: 'absolute',
 					top: 0,
 					left: 0,
 					width: '100%',
-					height: 1,
+					height: getLineCount(),
 					zIndex: 2,
 					paddingLeft: 1,
 					paddingRight: 1
 				}}
+				wrapMode="char"
 				onMouseDown={(e) => {
-					const inputRef = appState.inputRef();
-					if (!inputRef) return;
-					inputRef.cursorPosition = e.x - 1;
+					if (!textareaRef) return;
+					// Calculate cursor position from click
+					const availableWidth = getAvailableWidth();
+					const row = e.y;
+					const col = e.x - 1; // -1 for padding
+					const pos = row * availableWidth + col;
+					textareaRef.editBuffer.setCursor(0, Math.min(pos, getValue().length));
 					queueMicrotask(() => {
-						appState.setCursorPosition(inputRef.cursorPosition);
+						appState.setCursorPosition(pos);
 					});
 				}}
 			>
@@ -157,48 +257,26 @@ export const MainInput: Component = () => {
 					</For>
 				</Show>
 			</text>
-			{/* Hidden input - handles actual typing and cursor */}
-			<input
+			{/* Hidden textarea - handles actual typing, cursor, and word wrap */}
+			<textarea
 				id="main-input"
-				onInput={(v) => {
-					const parts = handleInputChange(v);
-					appState.setInputState(parts);
+				ref={(r: TextareaRenderable) => {
+					textareaRef = r;
+					appState.setInputRef(r);
 				}}
-				onKeyDown={(event: KeyEvent) => {
-					if (event.name === 'backspace') {
-						const curPos = appState.inputRef()?.cursorPosition ?? 0;
-						const parts = appState.inputState();
-
-						let offset = 0;
-						for (let i = 0; i < parts.length; i++) {
-							const part = parts[i]!;
-							const valueLen = getPartValueLength(part);
-
-							if (curPos <= offset + valueLen) {
-								if (part.type === 'pasted') {
-									event.preventDefault();
-									const newParts = [...parts.slice(0, i), ...parts.slice(i + 1)];
-									appState.setInputState(newParts);
-									const inputRef = appState.inputRef();
-									if (inputRef) inputRef.cursorPosition = offset;
-									appState.setCursorPosition(offset);
-									return;
-								}
-								break;
-							}
-							offset += valueLen;
-						}
-					}
-					queueMicrotask(() => {
-						const inputRef = appState.inputRef();
-						if (!inputRef) return;
-						appState.setCursorPosition(inputRef.cursorPosition);
-					});
-				}}
-				value={getValue()}
+				initialValue=""
+				wrapMode="char"
 				focused={appState.mode() === 'chat'}
-				ref={(r) => appState.setInputRef(r)}
-				// Make input text transparent so styled overlay shows through
+				onContentChange={() => {
+					if (textareaRef) {
+						handleContentChange(textareaRef.plainText);
+					}
+				}}
+				onKeyDown={handleKeyDown}
+				onCursorChange={(e) => {
+					appState.setCursorPosition(e.visualColumn);
+				}}
+				// Make textarea text transparent so styled overlay shows through
 				textColor="transparent"
 				backgroundColor="transparent"
 				focusedBackgroundColor="transparent"
@@ -208,7 +286,7 @@ export const MainInput: Component = () => {
 					top: 0,
 					left: 0,
 					width: '100%',
-					height: 1,
+					minHeight: 1,
 					zIndex: 1, // Below the styled text
 					paddingLeft: 1,
 					paddingRight: 1
