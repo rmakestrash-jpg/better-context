@@ -108,11 +108,12 @@ const mergeResources = (cliResources: string[], mentionedResources: string[]): s
 // === Ask Subcommand ===
 const questionOption = Options.text('question').pipe(Options.withAlias('q'));
 const resourceOption = Options.text('resource').pipe(Options.withAlias('r'), Options.repeated);
+const techOption = Options.text('tech').pipe(Options.withAlias('t'), Options.optional);
 
 const askCommand = Command.make(
 	'ask',
-	{ question: questionOption, resource: resourceOption },
-	({ question, resource }) =>
+	{ question: questionOption, resource: resourceOption, tech: techOption },
+	({ question, resource, tech }) =>
 		Effect.gen(function* () {
 			const services = yield* initializeCoreServices;
 
@@ -121,6 +122,10 @@ const askCommand = Command.make(
 
 			// Merge CLI -r flags with @mentions
 			let resourceNames = mergeResources([...resource], parsed.resources);
+
+			if (tech._tag === 'Some') {
+				resourceNames = mergeResources(resourceNames, [tech.value]);
+			}
 
 			// If no resources specified, prompt user
 			if (resourceNames.length === 0) {
