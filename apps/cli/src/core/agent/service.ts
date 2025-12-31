@@ -78,6 +78,8 @@ export const buildOpenCodeConfig = (args: { resources: ResourceInfo[] }): OpenCo
 
 	const prompt = getMultiRepoDocsAgentPrompt({ repos });
 
+	console.log('prompt', prompt);
+
 	return {
 		provider: BTCA_PRESET_MODELS,
 		agent: {

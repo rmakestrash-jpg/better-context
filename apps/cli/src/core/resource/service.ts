@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import type { ResourceDefinition, ResourceInfo } from './types.ts';
 import { isGitResource, isLocalResource } from './types.ts';
 import { ResourceError, ResourceNotFoundError, ResourceNotCachedError } from './errors.ts';
-import { ensureGitResource, isGitResourceCached } from './strategies/git.ts';
+import { cloneWithDegit, ensureGitResource, isGitResourceCached } from './strategies/git.ts';
 import { ensureLocalResource, isLocalResourceValid } from './strategies/local.ts';
 import { directoryExists, removeDirectory } from '../../lib/utils/files.ts';
 
@@ -51,14 +51,7 @@ const createResourceService = (config: ResourceServiceConfig) =>
 			 * For git resources, clones or optionally pulls.
 			 * For local resources, validates the path exists.
 			 */
-			ensure: (
-				name: string,
-				options?: { refresh?: boolean; quiet?: boolean }
-			): Effect.Effect<
-				ResourceInfo,
-				ResourceError | ResourceNotFoundError,
-				FileSystem.FileSystem
-			> =>
+			ensure: (name: string, options?: { refresh?: boolean; quiet?: boolean }) =>
 				Effect.gen(function* () {
 					const resource = yield* getResourceDefinition(name);
 					const { refresh = false, quiet = false } = options ?? {};
@@ -94,14 +87,7 @@ const createResourceService = (config: ResourceServiceConfig) =>
 			/**
 			 * Force refresh a resource (re-pull git, re-validate local)
 			 */
-			refresh: (
-				name: string,
-				options?: { quiet?: boolean }
-			): Effect.Effect<
-				ResourceInfo,
-				ResourceError | ResourceNotFoundError,
-				FileSystem.FileSystem
-			> =>
+			refresh: (name: string, options?: { quiet?: boolean }) =>
 				Effect.gen(function* () {
 					const resource = yield* getResourceDefinition(name);
 					const { quiet = false } = options ?? {};
@@ -153,15 +139,7 @@ const createResourceService = (config: ResourceServiceConfig) =>
 					const resource = yield* getResourceDefinition(name);
 
 					if (isGitResource(resource)) {
-						const isCached = yield* isGitResourceCached({ resource, resourcesDir });
-						if (!isCached) {
-							return yield* Effect.fail(new ResourceNotCachedError({ name }));
-						}
-						let path = pathService.join(resourcesDir, resource.name);
-						if (resource.searchPath) {
-							path = pathService.join(path, resource.searchPath);
-						}
-						return path;
+						return pathService.join(resourcesDir, resource.name);
 					} else if (isLocalResource(resource)) {
 						const isValid = yield* isLocalResourceValid({ resource });
 						if (!isValid) {

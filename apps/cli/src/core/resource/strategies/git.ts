@@ -4,6 +4,33 @@ import type { GitResource, ResourceInfo } from '../types.ts';
 import { ResourceError } from '../errors.ts';
 import { directoryExists } from '../../../lib/utils/files.ts';
 
+/** clone a git repo with degit */
+export const cloneWithDegit = (args: {
+	repoDir: string;
+	url: string;
+	branch: string;
+	searchPath?: string;
+	quiet?: boolean;
+}) =>
+	Effect.tryPromise({
+		try: async () => {
+			const { repoDir, url, branch, searchPath, quiet } = args;
+			const proc = Bun.spawn(
+				['bunx', 'degit', `${url}/${searchPath}#${branch}`, repoDir, '--force'],
+				{
+					stdout: quiet ? 'ignore' : 'inherit',
+					stderr: quiet ? 'ignore' : 'inherit'
+				}
+			);
+			const exitCode = await proc.exited;
+			if (exitCode !== 0) {
+				throw new Error(`Failed to clone repo with degit: ${exitCode}`);
+			}
+		},
+		catch: (error) =>
+			new ResourceError({ message: 'Failed to clone repo with degit', cause: error })
+	});
+
 /**
  * Clone a git repository
  */
@@ -70,35 +97,36 @@ export const ensureGitResource = (args: {
 	resourcesDir: string;
 	refresh?: boolean;
 	quiet?: boolean;
-}): Effect.Effect<ResourceInfo, ResourceError, FileSystem.FileSystem> =>
+}) =>
 	Effect.gen(function* () {
 		const { resource, resourcesDir, refresh = false, quiet = false } = args;
 		const repoDir = `${resourcesDir}/${resource.name}`;
 
-		const exists = yield* directoryExists(repoDir).pipe(
-			Effect.mapError((e) => new ResourceError({ message: e.message, cause: e }))
-		);
+		// const exists = yield* directoryExists(repoDir).pipe(
+		// 	Effect.mapError((e) => new ResourceError({ message: e.message, cause: e }))
+		// );
 
-		if (exists) {
-			if (refresh) {
-				if (!quiet) yield* Effect.log(`Pulling latest changes for ${resource.name}...`);
-				yield* pullRepo({ repoDir, branch: resource.branch, quiet });
-			}
-		} else {
-			if (!quiet) yield* Effect.log(`Cloning ${resource.name}...`);
-			yield* cloneRepo({ repoDir, url: resource.url, branch: resource.branch, quiet });
-		}
+		// if (exists) {
+		// 	if (refresh) {
+		// 		if (!quiet) yield* Effect.log(`Pulling latest changes for ${resource.name}...`);
+		// 		yield* pullRepo({ repoDir, branch: resource.branch, quiet });
+		// 	}
+		// } else {
+		// 	if (!quiet) yield* Effect.log(`Cloning ${resource.name}...`);
+		// 	yield* cloneRepo({ repoDir, url: resource.url, branch: resource.branch, quiet });
+		// }
 
-		// Compute final path (may include searchPath)
-		let finalPath = repoDir;
-		if (resource.searchPath) {
-			finalPath = `${repoDir}/${resource.searchPath}`;
-		}
+		yield* cloneWithDegit({
+			repoDir,
+			url: resource.url,
+			branch: resource.branch,
+			searchPath: resource.searchPath,
+			quiet
+		});
 
 		return {
 			name: resource.name,
 			type: 'git' as const,
-			path: finalPath,
 			specialNotes: resource.specialNotes
 		};
 	});

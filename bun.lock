@@ -19,13 +19,6 @@
       "bin": {
         "btca": "bin.js",
       },
-      "dependencies": {
-        "@shikijs/langs": "^3.20.0",
-        "@shikijs/themes": "^3.20.0",
-        "drizzle-orm": "^0.45.1",
-        "marked": "^17.0.1",
-        "shiki": "^3.20.0",
-      },
       "devDependencies": {
         "@btca/shared": "workspace:*",
         "@effect/cli": "^0.72.1",
@@ -38,10 +31,17 @@
         "@opencode-ai/sdk": "^1.0.208",
         "@opentui/core": "^0.1.65",
         "@opentui/solid": "^0.1.65",
+        "@shikijs/langs": "^3.20.0",
+        "@shikijs/themes": "^3.20.0",
         "@types/bun": "latest",
+        "@types/degit": "^2.8.6",
         "better-sqlite3": "^12.5.0",
+        "degit": "^2.8.4",
         "drizzle-kit": "^0.31.8",
+        "drizzle-orm": "^0.45.1",
         "effect": "^3.19.13",
+        "marked": "^17.0.1",
+        "shiki": "^3.20.0",
         "solid-js": "^1.9.10",
         "typescript": "^5.9.3",
       },
@@ -481,6 +481,8 @@
 
     "@types/cookie": ["@types/cookie@0.6.0", "", {}, "sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA=="],
 
+    "@types/degit": ["@types/degit@2.8.6", "", {}, "sha512-y0M7sqzsnHB6cvAeTCBPrCQNQiZe8U4qdzf8uBVmOWYap5MMTN/gB2iEqrIqFiYcsyvP74GnGD5tgsHttielFw=="],
+
     "@types/estree": ["@types/estree@1.0.8", "", {}, "sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w=="],
 
     "@types/hast": ["@types/hast@3.0.4", "", { "dependencies": { "@types/unist": "*" } }, "sha512-WPs+bbQw5aCj+x6laNGWLH3wviHtoCv/P3+otBhbOhJgG8qtpdAMlTCxLtsTWA7LH1Oh/bFCHsBn0TPS5m30EQ=="],
@@ -626,6 +628,8 @@
     "deepmerge": ["deepmerge@4.3.1", "", {}, "sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A=="],
 
     "define-lazy-prop": ["define-lazy-prop@2.0.0", "", {}, "sha512-Ds09qNh8yw3khSjiJjiUInaGX9xlqZDY7JVryGxdxV7NPeuqQfplOpQ66yJFZut3jLa5zOwkXw1g9EI2uKh4Og=="],
+
+    "degit": ["degit@2.8.4", "", { "bin": { "degit": "degit" } }, "sha512-vqYuzmSA5I50J882jd+AbAhQtgK6bdKUJIex1JNfEUPENCgYsxugzKVZlFyMwV4i06MmnV47/Iqi5Io86zf3Ng=="],
 
     "dequal": ["dequal@2.0.3", "", {}, "sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA=="],
 

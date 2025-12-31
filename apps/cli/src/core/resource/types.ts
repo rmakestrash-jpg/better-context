@@ -38,6 +38,5 @@ export const isLocalResource = (r: ResourceDefinition): r is LocalResource => r.
 export interface ResourceInfo {
 	name: string;
 	type: ResourceDefinition['type'];
-	path: string; // absolute path to cached resource
 	specialNotes?: string;
 }

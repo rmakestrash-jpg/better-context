@@ -54,18 +54,16 @@
 		"@opencode-ai/sdk": "^1.0.208",
 		"@opentui/core": "^0.1.65",
 		"@opentui/solid": "^0.1.65",
+		"@shikijs/langs": "^3.20.0",
+		"@shikijs/themes": "^3.20.0",
 		"@types/bun": "latest",
 		"better-sqlite3": "^12.5.0",
 		"drizzle-kit": "^0.31.8",
+		"drizzle-orm": "^0.45.1",
 		"effect": "^3.19.13",
+		"marked": "^17.0.1",
+		"shiki": "^3.20.0",
 		"solid-js": "^1.9.10",
 		"typescript": "^5.9.3"
-	},
-	"dependencies": {
-		"@shikijs/langs": "^3.20.0",
-		"@shikijs/themes": "^3.20.0",
-		"drizzle-orm": "^0.45.1",
-		"marked": "^17.0.1",
-		"shiki": "^3.20.0"
 	}
 }
