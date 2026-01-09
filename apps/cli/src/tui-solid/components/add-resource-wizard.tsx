@@ -138,8 +138,8 @@ export const AddResourceWizard: Component<AddResourceWizardProps> = (props) => {
 	const [wizardInput, setWizardInput] = createSignal('');
 	const [error, setError] = createSignal<string | null>(null);
 
-	const resourceType = createMemo(() => values().type as ResourceType);
-	const info = createMemo(() => getStepInfo(step(), resourceType() || 'git'));
+	const resourceType = createMemo(() => (values().type || 'git') as ResourceType);
+	const info = createMemo(() => getStepInfo(step(), resourceType()));
 
 	// Notify parent of step changes for status bar
 	createEffect(() => {
