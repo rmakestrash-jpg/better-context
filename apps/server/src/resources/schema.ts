@@ -1,21 +1,17 @@
-import { Schema } from 'effect';
+import { z } from "zod";
 
-const BaseResourceFields = {
-	name: Schema.String,
-	specialNotes: Schema.optional(Schema.String)
-};
-
-export const GitResourceSchema = Schema.Struct({
-	...BaseResourceFields,
-	type: Schema.Literal('git'),
-	url: Schema.String,
-	branch: Schema.String,
-	searchPath: Schema.optional(Schema.String)
+export const GitResourceSchema = z.object({
+	type: z.literal("git"),
+	name: z.string().min(1),
+	url: z.string().min(1),
+	branch: z.string().min(1),
+	searchPath: z.string().optional(),
+	specialNotes: z.string().optional()
 });
 
 export const ResourceDefinitionSchema = GitResourceSchema;
 
-export type GitResource = typeof GitResourceSchema.Type;
-export type ResourceDefinition = typeof ResourceDefinitionSchema.Type;
+export type GitResource = z.infer<typeof GitResourceSchema>;
+export type ResourceDefinition = z.infer<typeof ResourceDefinitionSchema>;
 
-export const isGitResource = (r: ResourceDefinition): r is GitResource => r.type === 'git';
+export const isGitResource = (value: ResourceDefinition): value is GitResource => value.type === "git";

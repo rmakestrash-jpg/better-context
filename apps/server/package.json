@@ -1,10 +1,12 @@
 {
 	"name": "@btca/server",
 	"version": "0.0.1",
-	"module": "index.ts",
+	"module": "src/index.ts",
 	"type": "module",
-	"publishConfig": {
-		"access": "public"
+	"private": true,
+	"exports": {
+		"./stream": "./src/stream/index.ts",
+		"./stream/types": "./src/stream/types.ts"
 	},
 	"scripts": {
 		"check": "tsgo --noEmit",
@@ -13,12 +15,11 @@
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
-		"@typescript/native-preview": "^7.0.0-dev.20260109.1"
+		"@typescript/native-preview": "^7.0.0-dev.20260109.1",
+		"prettier": "^3.7.4"
 	},
 	"dependencies": {
-		"@effect/platform": "^0.94.1",
-		"@effect/platform-bun": "^0.87.0",
 		"@opencode-ai/sdk": "^1.0.208",
-		"effect": "^3.19.14"
+		"zod": "^3.25.76"
 	}
 }
