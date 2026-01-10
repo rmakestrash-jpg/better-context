@@ -8,10 +8,16 @@
 	},
 	"scripts": {
 		"check": "tsgo --noEmit",
+		"dev": "bun --watch src/index.ts",
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
-		"@typescript/native-preview": "^7.0.0-dev.20251231.1"
+		"@typescript/native-preview": "^7.0.0-dev.20260109.1"
+	},
+	"dependencies": {
+		"@effect/platform": "^0.94.1",
+		"@effect/platform-bun": "^0.87.0",
+		"effect": "^3.19.14"
 	}
 }
