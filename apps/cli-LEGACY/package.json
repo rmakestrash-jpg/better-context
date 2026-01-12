@@ -1,5 +1,5 @@
 {
-	"name": "btca",
+	"name": "btca-legacy",
 	"author": "Ben Davis",
 	"version": "0.6.53",
 	"description": "CLI tool for asking questions about technologies using OpenCode",
