@@ -38,18 +38,16 @@
 		"dev": "bun run src/index.ts",
 		"build": "bun run scripts/build-binaries.ts"
 	},
-	"dependencies": {
-		"@btca/server": "workspace:*",
-		"commander": "^12.1.0",
-		"hono": "^4.7.11"
-	},
 	"devDependencies": {
+		"@btca/server": "workspace:*",
 		"@opentui/core": "^0.1.65",
 		"@opentui/solid": "^0.1.65",
 		"@shikijs/langs": "^3.20.0",
 		"@shikijs/themes": "^3.20.0",
 		"@types/bun": "latest",
 		"@typescript/native-preview": "^7.0.0-dev.20260109.1",
+		"commander": "^12.1.0",
+		"hono": "^4.7.11",
 		"marked": "^17.0.1",
 		"prettier": "^3.7.4",
 		"shiki": "^3.20.0",
