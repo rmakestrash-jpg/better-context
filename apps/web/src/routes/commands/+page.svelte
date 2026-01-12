@@ -20,6 +20,11 @@
 			example: 'btca chat -r svelte'
 		},
 		{
+			name: 'btca serve',
+			description: 'Start the btca server and listen for HTTP requests.',
+			example: 'btca serve -p 3000'
+		},
+		{
 			name: 'btca config model',
 			description: 'Set the AI model and provider.',
 			example: 'btca config model -p opencode -m claude-haiku-4-5'

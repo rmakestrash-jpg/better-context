@@ -1,6 +1,6 @@
 {
 	"name": "@btca/server",
-	"version": "1.0.0",
+	"version": "1.0.2",
 	"description": "BTCA server for answering questions about your codebase using OpenCode AI",
 	"author": "Ben Davis",
 	"license": "MIT",

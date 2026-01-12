@@ -3,11 +3,15 @@ import { askCommand } from './commands/ask.ts';
 import { chatCommand } from './commands/chat.ts';
 import { configCommand } from './commands/config.ts';
 import { clearCommand } from './commands/clear.ts';
+import { serveCommand } from './commands/serve.ts';
 import { launchTui } from './commands/tui.ts';
+import packageJson from '../package.json';
 
-// Read version from package.json, with fallback for compiled binaries
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-const VERSION = (globalThis as { __VERSION__?: string }).__VERSION__ ?? '0.7.0';
+// Version is injected at build time via Bun's define option
+// The __VERSION__ global is replaced with the actual version string during compilation
+// Falls back to package.json for dev mode
+declare const __VERSION__: string;
+const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : packageJson.version;
 
 const program = new Command()
 	.name('btca')
@@ -20,6 +24,7 @@ program.addCommand(askCommand);
 program.addCommand(chatCommand);
 program.addCommand(configCommand);
 program.addCommand(clearCommand);
+program.addCommand(serveCommand);
 
 // Default action (no subcommand) → launch TUI
 program.action(async (options: { server?: string; port?: number }) => {

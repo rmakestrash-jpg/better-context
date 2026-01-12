@@ -68,6 +68,20 @@ Start an interactive OpenCode session with resource context:
 btca chat -r svelte -r effect
 ```
 
+### Start Server
+
+Start the btca server and keep it running to handle HTTP requests:
+
+```bash
+# Start on default port (8080)
+btca serve
+
+# Start on custom port
+btca serve -p 3000
+```
+
+The server will run until you press `Ctrl+C` to stop it.
+
 ## Configuration
 
 btca uses a config file at `~/.config/btca/btca.config.jsonc`. Manage configuration via CLI commands.
