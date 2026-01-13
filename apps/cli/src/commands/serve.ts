@@ -3,6 +3,22 @@ import { startServer } from 'btca-server';
 
 const DEFAULT_PORT = 8080;
 
+/**
+ * Format an error for display.
+ * Server errors may have hints attached.
+ */
+function formatError(error: unknown): string {
+	if (error && typeof error === 'object' && 'hint' in error) {
+		const e = error as { message?: string; hint?: string };
+		let output = `Error: ${e.message ?? String(error)}`;
+		if (e.hint) {
+			output += `\n\nHint: ${e.hint}`;
+		}
+		return output;
+	}
+	return `Error: ${error instanceof Error ? error.message : String(error)}`;
+}
+
 export const serveCommand = new Command('serve')
 	.description('Start the btca server and listen for requests')
 	.option('-p, --port <port>', 'Port to listen on (default: 8080)')
@@ -30,7 +46,7 @@ export const serveCommand = new Command('serve')
 				// Never resolves - keeps the server running
 			});
 		} catch (error) {
-			console.error('Error:', error instanceof Error ? error.message : String(error));
+			console.error(formatError(error));
 			process.exit(1);
 		}
 	});

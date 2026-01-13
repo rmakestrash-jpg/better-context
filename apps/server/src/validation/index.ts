@@ -57,9 +57,7 @@ export const LIMITS = {
 // Validation Result Type
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ValidationResult =
-	| { valid: true }
-	| { valid: false; error: string };
+export type ValidationResult = { valid: true } | { valid: false; error: string };
 
 const ok = (): ValidationResult => ({ valid: true });
 const fail = (error: string): ValidationResult => ({ valid: false, error });
@@ -83,9 +81,7 @@ export const validateResourceName = (name: string): ValidationResult => {
 	}
 
 	if (name.length > LIMITS.RESOURCE_NAME_MAX) {
-		return fail(
-			`Resource name too long: ${name.length} chars (max ${LIMITS.RESOURCE_NAME_MAX})`
-		);
+		return fail(`Resource name too long: ${name.length} chars (max ${LIMITS.RESOURCE_NAME_MAX})`);
 	}
 
 	if (!RESOURCE_NAME_REGEX.test(name)) {
@@ -112,9 +108,7 @@ export const validateBranchName = (branch: string): ValidationResult => {
 	}
 
 	if (branch.length > LIMITS.BRANCH_NAME_MAX) {
-		return fail(
-			`Branch name too long: ${branch.length} chars (max ${LIMITS.BRANCH_NAME_MAX})`
-		);
+		return fail(`Branch name too long: ${branch.length} chars (max ${LIMITS.BRANCH_NAME_MAX})`);
 	}
 
 	if (branch.startsWith('-')) {
@@ -198,9 +192,7 @@ export const validateSearchPath = (searchPath: string | undefined): ValidationRe
 	}
 
 	if (searchPath.length > LIMITS.SEARCH_PATH_MAX) {
-		return fail(
-			`Search path too long: ${searchPath.length} chars (max ${LIMITS.SEARCH_PATH_MAX})`
-		);
+		return fail(`Search path too long: ${searchPath.length} chars (max ${LIMITS.SEARCH_PATH_MAX})`);
 	}
 
 	// Reject newlines (pattern injection)
@@ -210,7 +202,7 @@ export const validateSearchPath = (searchPath: string | undefined): ValidationRe
 
 	// Reject path traversal sequences
 	if (searchPath.includes('..')) {
-		return fail('Search path must not contain path traversal sequences (..)')
+		return fail('Search path must not contain path traversal sequences (..)');
 	}
 
 	// Reject absolute paths

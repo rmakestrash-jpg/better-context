@@ -1,8 +1,22 @@
 import { Command } from 'commander';
 import { ensureServer } from '../server/manager.ts';
-import { createClient, getResources, askQuestionStream } from '../client/index.ts';
+import { createClient, getResources, askQuestionStream, BtcaError } from '../client/index.ts';
 import { parseSSEStream } from '../client/stream.ts';
 import type { BtcaStreamEvent } from 'btca-server/stream/types';
+
+/**
+ * Format an error for display, including hint if available.
+ */
+function formatError(error: unknown): string {
+	if (error instanceof BtcaError) {
+		let output = `Error: ${error.message}`;
+		if (error.hint) {
+			output += `\n\nHint: ${error.hint}`;
+		}
+		return output;
+	}
+	return `Error: ${error instanceof Error ? error.message : String(error)}`;
+}
 
 /**
  * Parse @mentions from query string
@@ -137,7 +151,7 @@ export const askCommand = new Command('ask')
 			console.log('\n');
 			server.stop();
 		} catch (error) {
-			console.error('Error:', error instanceof Error ? error.message : String(error));
+			console.error(formatError(error));
 			process.exit(1);
 		}
 	});

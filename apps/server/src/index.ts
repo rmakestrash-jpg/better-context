@@ -7,7 +7,7 @@ import { Collections } from './collections/service.ts';
 import { getCollectionKey } from './collections/types.ts';
 import { Config } from './config/index.ts';
 import { Context } from './context/index.ts';
-import { getErrorMessage, getErrorTag } from './errors.ts';
+import { getErrorMessage, getErrorTag, getErrorHint } from './errors.ts';
 import { Metrics } from './metrics/index.ts';
 import { Resources } from './resources/service.ts';
 import { GitResourceSchema, LocalResourceSchema } from './resources/schema.ts';
@@ -65,7 +65,10 @@ const QuestionRequestSchema = z.object({
 		.max(LIMITS.QUESTION_MAX, `Question too long (max ${LIMITS.QUESTION_MAX} chars)`),
 	resources: z
 		.array(ResourceNameField)
-		.max(LIMITS.MAX_RESOURCES_PER_REQUEST, `Too many resources (max ${LIMITS.MAX_RESOURCES_PER_REQUEST})`)
+		.max(
+			LIMITS.MAX_RESOURCES_PER_REQUEST,
+			`Too many resources (max ${LIMITS.MAX_RESOURCES_PER_REQUEST})`
+		)
 		.optional(),
 	quiet: z.boolean().optional()
 });
@@ -73,7 +76,10 @@ const QuestionRequestSchema = z.object({
 const OpencodeRequestSchema = z.object({
 	resources: z
 		.array(ResourceNameField)
-		.max(LIMITS.MAX_RESOURCES_PER_REQUEST, `Too many resources (max ${LIMITS.MAX_RESOURCES_PER_REQUEST})`)
+		.max(
+			LIMITS.MAX_RESOURCES_PER_REQUEST,
+			`Too many resources (max ${LIMITS.MAX_RESOURCES_PER_REQUEST})`
+		)
 		.optional(),
 	quiet: z.boolean().optional()
 });
@@ -179,8 +185,18 @@ const createApp = (deps: {
 			Metrics.error('http.error', { error: Metrics.errorInfo(err) });
 			const tag = getErrorTag(err);
 			const message = getErrorMessage(err);
-			const status = tag === 'CollectionError' || tag === 'ResourceError' ? 400 : 500;
-			return c.json({ error: message, tag }, status);
+			const hint = getErrorHint(err);
+			const status =
+				tag === 'RequestError' ||
+				tag === 'CollectionError' ||
+				tag === 'ResourceError' ||
+				tag === 'ConfigError' ||
+				tag === 'InvalidProviderError' ||
+				tag === 'InvalidModelError' ||
+				tag === 'ProviderNotConnectedError'
+					? 400
+					: 500;
+			return c.json({ error: message, tag, ...(hint && { hint }) }, status);
 		})
 
 		// ─────────────────────────────────────────────────────────────────────

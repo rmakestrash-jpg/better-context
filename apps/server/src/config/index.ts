@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 
 import { z } from 'zod';
+import { CommonHints, type TaggedErrorOptions } from '../errors.ts';
 import { Metrics } from '../metrics/index.ts';
 import { ResourceDefinitionSchema, type ResourceDefinition } from '../resources/schema.ts';
 
@@ -97,10 +98,12 @@ export namespace Config {
 	export class ConfigError extends Error {
 		readonly _tag = 'ConfigError';
 		override readonly cause?: unknown;
+		readonly hint?: string;
 
-		constructor(args: { message: string; cause?: unknown }) {
+		constructor(args: TaggedErrorOptions) {
 			super(args.message);
 			this.cause = args.cause;
+			this.hint = args.hint;
 		}
 	}
 
@@ -346,7 +349,11 @@ export namespace Config {
 			await fs.mkdir(configDir, { recursive: true });
 			await Bun.write(newConfigPath, JSON.stringify(migrated, null, 2));
 		} catch (cause) {
-			throw new ConfigError({ message: 'Failed to write migrated config', cause });
+			throw new ConfigError({
+				message: 'Failed to write migrated config',
+				hint: `Check that you have write permissions to "${configDir}".`,
+				cause
+			});
 		}
 
 		Metrics.info('config.legacy.migrated', {
@@ -372,19 +379,34 @@ export namespace Config {
 		try {
 			content = await Bun.file(configPath).text();
 		} catch (cause) {
-			throw new ConfigError({ message: 'Failed to read config', cause });
+			throw new ConfigError({
+				message: `Failed to read config file: "${configPath}"`,
+				hint: 'Check that the file exists and you have read permissions.',
+				cause
+			});
 		}
 
 		let parsed: unknown;
 		try {
 			parsed = parseJsonc(content);
 		} catch (cause) {
-			throw new ConfigError({ message: 'Failed to parse config JSONC', cause });
+			throw new ConfigError({
+				message: 'Failed to parse config file - invalid JSON syntax',
+				hint: `Check "${configPath}" for syntax errors like missing commas, brackets, or quotes.`,
+				cause
+			});
 		}
 
 		const result = StoredConfigSchema.safeParse(parsed);
 		if (!result.success) {
-			throw new ConfigError({ message: 'Invalid config', cause: result.error });
+			const issues = result.error.issues
+				.map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+				.join('\n');
+			throw new ConfigError({
+				message: `Invalid config structure:\n${issues}`,
+				hint: `${CommonHints.CHECK_CONFIG} Required fields: "resources" (array), "model" (string), "provider" (string).`,
+				cause: result.error
+			});
 		}
 		return result.data;
 	};
@@ -394,7 +416,11 @@ export namespace Config {
 		try {
 			await fs.mkdir(configDir, { recursive: true });
 		} catch (cause) {
-			throw new ConfigError({ message: 'Failed to create config directory', cause });
+			throw new ConfigError({
+				message: `Failed to create config directory: "${configDir}"`,
+				hint: 'Check that you have write permissions to the parent directory.',
+				cause
+			});
 		}
 
 		const defaultStored: StoredConfig = {
@@ -407,7 +433,11 @@ export namespace Config {
 		try {
 			await Bun.write(configPath, JSON.stringify(defaultStored, null, 2));
 		} catch (cause) {
-			throw new ConfigError({ message: 'Failed to write default config', cause });
+			throw new ConfigError({
+				message: `Failed to write default config to: "${configPath}"`,
+				hint: 'Check that you have write permissions to the config directory.',
+				cause
+			});
 		}
 
 		return defaultStored;
@@ -417,7 +447,11 @@ export namespace Config {
 		try {
 			await Bun.write(configPath, JSON.stringify(stored, null, 2));
 		} catch (cause) {
-			throw new ConfigError({ message: 'Failed to write config', cause });
+			throw new ConfigError({
+				message: `Failed to save config to: "${configPath}"`,
+				hint: 'Check that you have write permissions and the disk is not full.',
+				cause
+			});
 		}
 	};
 
@@ -455,7 +489,10 @@ export namespace Config {
 			addResource: async (resource: ResourceDefinition) => {
 				// Check for duplicate name
 				if (currentStored.resources.some((r) => r.name === resource.name)) {
-					throw new ConfigError({ message: `Resource "${resource.name}" already exists` });
+					throw new ConfigError({
+						message: `Resource "${resource.name}" already exists`,
+						hint: `Choose a different name or remove the existing resource first with "btca config remove-resource -n ${resource.name}".`
+					});
 				}
 				currentStored = {
 					...currentStored,
@@ -469,7 +506,14 @@ export namespace Config {
 			removeResource: async (name: string) => {
 				const exists = currentStored.resources.some((r) => r.name === name);
 				if (!exists) {
-					throw new ConfigError({ message: `Resource "${name}" not found` });
+					const available = currentStored.resources.map((r) => r.name);
+					throw new ConfigError({
+						message: `Resource "${name}" not found`,
+						hint:
+							available.length > 0
+								? `Available resources: ${available.join(', ')}. ${CommonHints.LIST_RESOURCES}`
+								: `No resources configured. ${CommonHints.ADD_RESOURCE}`
+					});
 				}
 				currentStored = {
 					...currentStored,

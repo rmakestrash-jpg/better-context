@@ -1,3 +1,5 @@
+import type { TaggedErrorOptions } from '../errors.ts';
+
 export type CollectionResult = {
 	path: string;
 	agentInstructions: string;
@@ -6,10 +8,12 @@ export type CollectionResult = {
 export class CollectionError extends Error {
 	readonly _tag = 'CollectionError';
 	override readonly cause?: unknown;
+	readonly hint?: string;
 
-	constructor(args: { message: string; cause?: unknown }) {
+	constructor(args: TaggedErrorOptions) {
 		super(args.message);
 		this.cause = args.cause;
+		this.hint = args.hint;
 	}
 }
 

@@ -4,6 +4,39 @@ import type { AppType } from 'btca-server';
 export type Client = ReturnType<typeof hc<AppType>>;
 
 /**
+ * Custom error class that carries hints from the server.
+ */
+export class BtcaError extends Error {
+	readonly hint?: string;
+	readonly tag?: string;
+
+	constructor(message: string, options?: { hint?: string; tag?: string }) {
+		super(message);
+		this.name = 'BtcaError';
+		this.hint = options?.hint;
+		this.tag = options?.tag;
+	}
+}
+
+/**
+ * Parse error response from server and create a BtcaError.
+ */
+async function parseErrorResponse(
+	res: { json: () => Promise<unknown> },
+	fallbackMessage: string
+): Promise<BtcaError> {
+	try {
+		const body = (await res.json()) as { error?: string; hint?: string; tag?: string };
+		return new BtcaError(body.error ?? fallbackMessage, {
+			hint: body.hint,
+			tag: body.tag
+		});
+	} catch {
+		return new BtcaError(fallbackMessage);
+	}
+}
+
+/**
  * Create a typed Hono RPC client for the btca server
  */
 export function createClient(baseUrl: string): Client {
@@ -16,7 +49,7 @@ export function createClient(baseUrl: string): Client {
 export async function getConfig(client: Client) {
 	const res = await client.config.$get();
 	if (!res.ok) {
-		throw new Error(`Failed to get config: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to get config: ${res.status}`);
 	}
 	return res.json();
 }
@@ -27,7 +60,7 @@ export async function getConfig(client: Client) {
 export async function getResources(client: Client) {
 	const res = await client.resources.$get();
 	if (!res.ok) {
-		throw new Error(`Failed to get resources: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to get resources: ${res.status}`);
 	}
 	return res.json();
 }
@@ -52,8 +85,7 @@ export async function askQuestion(
 	});
 
 	if (!res.ok) {
-		const error = (await res.json()) as { error?: string };
-		throw new Error(error.error ?? `Failed to ask question: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to ask question: ${res.status}`);
 	}
 
 	return res.json();
@@ -77,8 +109,7 @@ export async function getOpencodeInstance(
 	});
 
 	if (!res.ok) {
-		const error = (await res.json()) as { error?: string };
-		throw new Error(error.error ?? `Failed to get opencode instance: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to get opencode instance: ${res.status}`);
 	}
 
 	return res.json();
@@ -111,8 +142,7 @@ export async function askQuestionStream(
 	});
 
 	if (!res.ok) {
-		const error = (await res.json()) as { error?: string };
-		throw new Error(error.error ?? `Failed to ask question: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to ask question: ${res.status}`);
 	}
 
 	return res;
@@ -135,8 +165,7 @@ export async function updateModel(
 	});
 
 	if (!res.ok) {
-		const error = (await res.json()) as { error?: string };
-		throw new Error(error.error ?? `Failed to update model: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to update model: ${res.status}`);
 	}
 
 	return res.json() as Promise<{ provider: string; model: string }>;
@@ -176,8 +205,7 @@ export async function addResource(
 	});
 
 	if (!res.ok) {
-		const error = (await res.json()) as { error?: string };
-		throw new Error(error.error ?? `Failed to add resource: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to add resource: ${res.status}`);
 	}
 
 	return res.json() as Promise<ResourceInput>;
@@ -196,8 +224,7 @@ export async function removeResource(baseUrl: string, name: string): Promise<voi
 	});
 
 	if (!res.ok) {
-		const error = (await res.json()) as { error?: string };
-		throw new Error(error.error ?? `Failed to remove resource: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to remove resource: ${res.status}`);
 	}
 }
 
@@ -213,8 +240,7 @@ export async function clearResources(baseUrl: string): Promise<{ cleared: number
 	});
 
 	if (!res.ok) {
-		const error = (await res.json()) as { error?: string };
-		throw new Error(error.error ?? `Failed to clear resources: ${res.status}`);
+		throw await parseErrorResponse(res, `Failed to clear resources: ${res.status}`);
 	}
 
 	return res.json() as Promise<{ cleared: number }>;
