@@ -455,58 +455,115 @@ export namespace Config {
 		}
 	};
 
+	/**
+	 * Create a config service.
+	 *
+	 * When both global and project configs exist, mutations (add/remove resource, update model)
+	 * only modify the project config. The merged view is computed on-the-fly for reads.
+	 *
+	 * @param globalConfig - The global config (always present)
+	 * @param projectConfig - The project config (null if not using project-level config)
+	 * @param resourcesDirectory - Directory for resource data
+	 * @param collectionsDirectory - Directory for collection data
+	 * @param configPath - Path to the config file to save (project if exists, else global)
+	 */
 	const makeService = (
-		stored: StoredConfig,
+		globalConfig: StoredConfig,
+		projectConfig: StoredConfig | null,
 		resourcesDirectory: string,
 		collectionsDirectory: string,
 		configPath: string
 	): Service => {
-		// Mutable state that tracks current config
-		let currentStored = stored;
+		// Track configs separately to avoid resource leakage
+		let currentGlobalConfig = globalConfig;
+		let currentProjectConfig = projectConfig;
+
+		// Compute merged resources on-the-fly
+		const getMergedResources = (): readonly ResourceDefinition[] => {
+			if (!currentProjectConfig) {
+				return currentGlobalConfig.resources;
+			}
+			// Merge: global first, then project overrides by name
+			const resourceMap = new Map<string, ResourceDefinition>();
+			for (const resource of currentGlobalConfig.resources) {
+				resourceMap.set(resource.name, resource);
+			}
+			for (const resource of currentProjectConfig.resources) {
+				resourceMap.set(resource.name, resource);
+			}
+			return Array.from(resourceMap.values());
+		};
+
+		// Get the config that should be used for model/provider
+		const getActiveConfig = (): StoredConfig => {
+			return currentProjectConfig ?? currentGlobalConfig;
+		};
+
+		// Get the config that should be mutated
+		const getMutableConfig = (): StoredConfig => {
+			return currentProjectConfig ?? currentGlobalConfig;
+		};
+
+		// Update the mutable config
+		const setMutableConfig = (config: StoredConfig): void => {
+			if (currentProjectConfig) {
+				currentProjectConfig = config;
+			} else {
+				currentGlobalConfig = config;
+			}
+		};
 
 		const service: Service = {
 			resourcesDirectory,
 			collectionsDirectory,
 			configPath,
 			get resources() {
-				return currentStored.resources;
+				return getMergedResources();
 			},
 			get model() {
-				return currentStored.model;
+				return getActiveConfig().model;
 			},
 			get provider() {
-				return currentStored.provider;
+				return getActiveConfig().provider;
 			},
-			getResource: (name: string) => currentStored.resources.find((r) => r.name === name),
+			getResource: (name: string) => getMergedResources().find((r) => r.name === name),
 
 			updateModel: async (provider: string, model: string) => {
-				currentStored = { ...currentStored, provider, model };
-				await saveConfig(configPath, currentStored);
+				const mutableConfig = getMutableConfig();
+				const updated = { ...mutableConfig, provider, model };
+				setMutableConfig(updated);
+				await saveConfig(configPath, updated);
 				Metrics.info('config.model.updated', { provider, model });
 				return { provider, model };
 			},
 
 			addResource: async (resource: ResourceDefinition) => {
-				// Check for duplicate name
-				if (currentStored.resources.some((r) => r.name === resource.name)) {
+				// Check for duplicate name in merged resources
+				const mergedResources = getMergedResources();
+				if (mergedResources.some((r) => r.name === resource.name)) {
 					throw new ConfigError({
 						message: `Resource "${resource.name}" already exists`,
 						hint: `Choose a different name or remove the existing resource first with "btca config remove-resource -n ${resource.name}".`
 					});
 				}
-				currentStored = {
-					...currentStored,
-					resources: [...currentStored.resources, resource]
+
+				// Add only to the mutable config (project if exists, else global)
+				const mutableConfig = getMutableConfig();
+				const updated = {
+					...mutableConfig,
+					resources: [...mutableConfig.resources, resource]
 				};
-				await saveConfig(configPath, currentStored);
+				setMutableConfig(updated);
+				await saveConfig(configPath, updated);
 				Metrics.info('config.resource.added', { name: resource.name, type: resource.type });
 				return resource;
 			},
 
 			removeResource: async (name: string) => {
-				const exists = currentStored.resources.some((r) => r.name === name);
+				const mergedResources = getMergedResources();
+				const exists = mergedResources.some((r) => r.name === name);
 				if (!exists) {
-					const available = currentStored.resources.map((r) => r.name);
+					const available = mergedResources.map((r) => r.name);
 					throw new ConfigError({
 						message: `Resource "${name}" not found`,
 						hint:
@@ -515,12 +572,50 @@ export namespace Config {
 								: `No resources configured. ${CommonHints.ADD_RESOURCE}`
 					});
 				}
-				currentStored = {
-					...currentStored,
-					resources: currentStored.resources.filter((r) => r.name !== name)
-				};
-				await saveConfig(configPath, currentStored);
-				Metrics.info('config.resource.removed', { name });
+
+				const mutableConfig = getMutableConfig();
+				const isInMutableConfig = mutableConfig.resources.some((r) => r.name === name);
+
+				if (currentProjectConfig) {
+					// We have a project config
+					const isInGlobal = currentGlobalConfig.resources.some((r) => r.name === name);
+					const isInProject = currentProjectConfig.resources.some((r) => r.name === name);
+
+					if (isInProject) {
+						// Resource is in project config - just remove it
+						const updated = {
+							...currentProjectConfig,
+							resources: currentProjectConfig.resources.filter((r) => r.name !== name)
+						};
+						currentProjectConfig = updated;
+						await saveConfig(configPath, updated);
+						Metrics.info('config.resource.removed', { name, from: 'project' });
+					} else if (isInGlobal) {
+						// Resource is only in global config
+						// User wants to remove a global resource from project context
+						// We can't modify global config from project context, so throw an error
+						throw new ConfigError({
+							message: `Resource "${name}" is defined in the global config`,
+							hint: `To remove this resource globally, edit the global config at "${expandHome(GLOBAL_CONFIG_DIR)}/${GLOBAL_CONFIG_FILENAME}" or run the command without a project config present.`
+						});
+					}
+				} else {
+					// No project config, modify global directly
+					if (!isInMutableConfig) {
+						// This shouldn't happen given the exists check above, but be safe
+						throw new ConfigError({
+							message: `Resource "${name}" not found in config`,
+							hint: CommonHints.LIST_RESOURCES
+						});
+					}
+					const updated = {
+						...mutableConfig,
+						resources: mutableConfig.resources.filter((r) => r.name !== name)
+					};
+					setMutableConfig(updated);
+					await saveConfig(configPath, updated);
+					Metrics.info('config.resource.removed', { name, from: 'global' });
+				}
 			},
 
 			clearResources: async () => {
@@ -558,47 +653,56 @@ export namespace Config {
 		const cwd = process.cwd();
 		Metrics.info('config.load.start', { cwd });
 
+		const globalConfigPath = `${expandHome(GLOBAL_CONFIG_DIR)}/${GLOBAL_CONFIG_FILENAME}`;
 		const projectConfigPath = `${cwd}/${PROJECT_CONFIG_FILENAME}`;
-		if (await Bun.file(projectConfigPath).exists()) {
-			Metrics.info('config.load.source', { source: 'project', path: projectConfigPath });
-			const stored = await loadConfigFromPath(projectConfigPath);
+
+		// First, load or create the global config
+		let globalConfig: StoredConfig;
+		const globalExists = await Bun.file(globalConfigPath).exists();
+
+		if (!globalExists) {
+			// Check for legacy config to migrate
+			const legacyConfigPath = `${expandHome(GLOBAL_CONFIG_DIR)}/${LEGACY_CONFIG_FILENAME}`;
+			const migrated = await migrateLegacyConfig(legacyConfigPath, globalConfigPath);
+			if (migrated) {
+				Metrics.info('config.load.global', { source: 'migrated', path: globalConfigPath });
+				globalConfig = migrated;
+			} else {
+				Metrics.info('config.load.global', { source: 'default', path: globalConfigPath });
+				globalConfig = await createDefaultConfig(globalConfigPath);
+			}
+		} else {
+			Metrics.info('config.load.global', { source: 'existing', path: globalConfigPath });
+			globalConfig = await loadConfigFromPath(globalConfigPath);
+		}
+
+		// Now check for project config and merge if it exists
+		const projectExists = await Bun.file(projectConfigPath).exists();
+		if (projectExists) {
+			Metrics.info('config.load.project', { source: 'project', path: projectConfigPath });
+			const projectConfig = await loadConfigFromPath(projectConfigPath);
+
+			Metrics.info('config.load.merged', {
+				globalResources: globalConfig.resources.length,
+				projectResources: projectConfig.resources.length
+			});
+
+			// Use project paths for data storage when project config exists
+			// Pass both configs separately to avoid resource leakage on mutations
 			return makeService(
-				stored,
+				globalConfig,
+				projectConfig,
 				`${cwd}/${PROJECT_DATA_DIR}/resources`,
 				`${cwd}/${PROJECT_DATA_DIR}/collections`,
 				projectConfigPath
 			);
 		}
 
-		const globalConfigPath = `${expandHome(GLOBAL_CONFIG_DIR)}/${GLOBAL_CONFIG_FILENAME}`;
-		const globalExists = await Bun.file(globalConfigPath).exists();
-
-		// If new config doesn't exist, check for legacy config to migrate
-		if (!globalExists) {
-			const legacyConfigPath = `${expandHome(GLOBAL_CONFIG_DIR)}/${LEGACY_CONFIG_FILENAME}`;
-			const migrated = await migrateLegacyConfig(legacyConfigPath, globalConfigPath);
-			if (migrated) {
-				Metrics.info('config.load.source', { source: 'migrated', path: globalConfigPath });
-				return makeService(
-					migrated,
-					`${expandHome(GLOBAL_DATA_DIR)}/resources`,
-					`${expandHome(GLOBAL_DATA_DIR)}/collections`,
-					globalConfigPath
-				);
-			}
-		}
-
-		Metrics.info('config.load.source', {
-			source: globalExists ? 'global' : 'default',
-			path: globalConfigPath
-		});
-
-		const stored = globalExists
-			? await loadConfigFromPath(globalConfigPath)
-			: await createDefaultConfig(globalConfigPath);
-
+		// No project config, use global only
+		Metrics.info('config.load.source', { source: 'global', path: globalConfigPath });
 		return makeService(
-			stored,
+			globalConfig,
+			null,
 			`${expandHome(GLOBAL_DATA_DIR)}/resources`,
 			`${expandHome(GLOBAL_DATA_DIR)}/collections`,
 			globalConfigPath
