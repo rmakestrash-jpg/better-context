@@ -1,4 +1,11 @@
-import { createSignal, createEffect, createMemo, Show, type Component, type Setter } from 'solid-js';
+import {
+	createSignal,
+	createEffect,
+	createMemo,
+	Show,
+	type Component,
+	type Setter
+} from 'solid-js';
 import { colors } from '../theme.ts';
 import { useKeyboard, usePaste } from '@opentui/solid';
 import { useConfigContext } from '../context/config-context.tsx';
@@ -28,7 +35,14 @@ interface StepInfo {
 }
 
 // Git resource steps (after type selection)
-const GIT_STEPS: AddResourceWizardStep[] = ['name', 'url', 'branch', 'searchPath', 'notes', 'confirm'];
+const GIT_STEPS: AddResourceWizardStep[] = [
+	'name',
+	'url',
+	'branch',
+	'searchPath',
+	'notes',
+	'confirm'
+];
 
 // Local resource steps (after type selection)
 const LOCAL_STEPS: AddResourceWizardStep[] = ['name', 'path', 'notes', 'confirm'];
@@ -344,23 +358,26 @@ export const AddResourceWizard: Component<AddResourceWizardProps> = (props) => {
 			</Show>
 			<text content="" style={{ height: 1 }} />
 
-			<Show when={step() === 'confirm'} fallback={
-				<box style={{}}>
-					<input
-						placeholder={info().placeholder}
-						placeholderColor={colors.textSubtle}
-						textColor={colors.text}
-						value={wizardInput()}
-						onInput={(v) => {
-							setWizardInput(v);
-							setError(null);
-						}}
-						onSubmit={handleSubmit}
-						focused
-						style={{ width: '100%' }}
-					/>
-				</box>
-			}>
+			<Show
+				when={step() === 'confirm'}
+				fallback={
+					<box style={{}}>
+						<input
+							placeholder={info().placeholder}
+							placeholderColor={colors.textSubtle}
+							textColor={colors.text}
+							value={wizardInput()}
+							onInput={(v) => {
+								setWizardInput(v);
+								setError(null);
+							}}
+							onSubmit={handleSubmit}
+							focused
+							style={{ width: '100%' }}
+						/>
+					</box>
+				}
+			>
 				{renderConfirmation()}
 			</Show>
 		</box>

@@ -265,18 +265,20 @@
 					</li>
 					<li class="flex items-start gap-2">
 						<span class="mt-1.5 size-1.5 shrink-0 bg-[hsl(var(--bc-accent))]"></span>
+						<span>Show you the full list of suggested resources to confirm or modify</span>
+					</li>
+					<li class="flex items-start gap-2">
+						<span class="mt-1.5 size-1.5 shrink-0 bg-[hsl(var(--bc-accent))]"></span>
 						<span
-							>Show you the full list of suggested resources to confirm or modify</span
+							>Prepare the complete <code class="bc-inlineCode">btca.config.jsonc</code> and show it for
+							your approval</span
 						>
 					</li>
 					<li class="flex items-start gap-2">
 						<span class="mt-1.5 size-1.5 shrink-0 bg-[hsl(var(--bc-accent))]"></span>
-						<span>Prepare the complete <code class="bc-inlineCode">btca.config.jsonc</code> and show it for your approval</span>
-					</li>
-					<li class="flex items-start gap-2">
-						<span class="mt-1.5 size-1.5 shrink-0 bg-[hsl(var(--bc-accent))]"></span>
 						<span
-							>Create the config file and update <code class="bc-inlineCode">AGENTS.md</code> with usage instructions</span
+							>Create the config file and update <code class="bc-inlineCode">AGENTS.md</code> with usage
+							instructions</span
 						>
 					</li>
 				</ul>

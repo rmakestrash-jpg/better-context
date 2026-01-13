@@ -7,6 +7,7 @@ import {
 } from '@opencode-ai/sdk';
 
 import { Config } from '../config/index.ts';
+import { CommonHints, type TaggedErrorOptions } from '../errors.ts';
 import { Metrics } from '../metrics/index.ts';
 import type { CollectionResult } from '../collections/types.ts';
 import type { AgentResult } from './types.ts';
@@ -15,10 +16,12 @@ export namespace Agent {
 	export class AgentError extends Error {
 		readonly _tag = 'AgentError';
 		override readonly cause?: unknown;
+		readonly hint?: string;
 
-		constructor(args: { message: string; cause?: unknown }) {
+		constructor(args: TaggedErrorOptions) {
 			super(args.message);
 			this.cause = args.cause;
+			this.hint = args.hint;
 		}
 	}
 
@@ -26,11 +29,13 @@ export namespace Agent {
 		readonly _tag = 'InvalidProviderError';
 		readonly providerId: string;
 		readonly availableProviders: string[];
+		readonly hint: string;
 
 		constructor(args: { providerId: string; availableProviders: string[] }) {
-			super(`Invalid provider: ${args.providerId}`);
+			super(`Invalid provider: "${args.providerId}"`);
 			this.providerId = args.providerId;
 			this.availableProviders = args.availableProviders;
+			this.hint = `Available providers: ${args.availableProviders.join(', ')}. Update your config with a valid provider.`;
 		}
 	}
 
@@ -39,12 +44,18 @@ export namespace Agent {
 		readonly providerId: string;
 		readonly modelId: string;
 		readonly availableModels: string[];
+		readonly hint: string;
 
 		constructor(args: { providerId: string; modelId: string; availableModels: string[] }) {
-			super(`Invalid model: ${args.modelId}`);
+			super(`Invalid model "${args.modelId}" for provider "${args.providerId}"`);
 			this.providerId = args.providerId;
 			this.modelId = args.modelId;
 			this.availableModels = args.availableModels;
+			const modelList =
+				args.availableModels.length <= 5
+					? args.availableModels.join(', ')
+					: `${args.availableModels.slice(0, 5).join(', ')}... (${args.availableModels.length} total)`;
+			this.hint = `Available models for ${args.providerId}: ${modelList}. Update your config with a valid model.`;
 		}
 	}
 
@@ -52,11 +63,17 @@ export namespace Agent {
 		readonly _tag = 'ProviderNotConnectedError';
 		readonly providerId: string;
 		readonly connectedProviders: string[];
+		readonly hint: string;
 
 		constructor(args: { providerId: string; connectedProviders: string[] }) {
-			super(`Provider not connected: ${args.providerId}`);
+			super(`Provider "${args.providerId}" is not connected`);
 			this.providerId = args.providerId;
 			this.connectedProviders = args.connectedProviders;
+			if (args.connectedProviders.length > 0) {
+				this.hint = `${CommonHints.RUN_AUTH} Connected providers: ${args.connectedProviders.join(', ')}.`;
+			} else {
+				this.hint = `${CommonHints.RUN_AUTH} No providers are currently connected.`;
+			}
 		}
 	}
 
@@ -160,7 +177,11 @@ export namespace Agent {
 			const port = Math.floor(Math.random() * 3000) + 3000;
 			const created = await createOpencode({ port, config: args.ocConfig }).catch((err: any) => {
 				if (err?.cause instanceof Error && err.cause.stack?.includes('port')) return null;
-				throw new AgentError({ message: 'Failed to create OpenCode instance', cause: err });
+				throw new AgentError({
+					message: 'Failed to create OpenCode instance',
+					hint: 'This may be a temporary issue. Try running the command again.',
+					cause: err
+				});
 			});
 
 			if (created) {
@@ -174,7 +195,8 @@ export namespace Agent {
 		}
 
 		throw new AgentError({
-			message: 'Failed to create OpenCode instance - all port attempts exhausted'
+			message: 'Failed to create OpenCode instance - all port attempts exhausted',
+			hint: 'Check if you have too many btca processes running. Try closing other terminal sessions or restarting your machine.'
 		});
 	};
 
@@ -183,7 +205,11 @@ export namespace Agent {
 		client: OpencodeClient;
 	}): Promise<AsyncIterable<OcEvent>> => {
 		const events = await args.client.event.subscribe().catch((cause: unknown) => {
-			throw new AgentError({ message: 'Failed to subscribe to events', cause });
+			throw new AgentError({
+				message: 'Failed to subscribe to events',
+				hint: 'This may be a temporary connection issue. Try running the command again.',
+				cause
+			});
 		});
 
 		async function* gen() {
@@ -235,20 +261,41 @@ export namespace Agent {
 					await validateProviderAndModel(client, config.provider, config.model);
 					Metrics.info('agent.validate.ok', { provider: config.provider, model: config.model });
 				} catch (cause) {
-					throw new AgentError({ message: 'Provider/model validation failed', cause });
+					// Re-throw if it's already one of our specific error types with hints
+					if (
+						cause instanceof InvalidProviderError ||
+						cause instanceof InvalidModelError ||
+						cause instanceof ProviderNotConnectedError
+					) {
+						throw cause;
+					}
+					throw new AgentError({
+						message: 'Provider/model validation failed',
+						hint: `Check that provider "${config.provider}" and model "${config.model}" are valid. ${CommonHints.RUN_AUTH}`,
+						cause
+					});
 				}
 
 				const session = await client.session.create().catch((cause: unknown) => {
-					throw new AgentError({ message: 'Failed to create session', cause });
+					throw new AgentError({
+						message: 'Failed to create session',
+						hint: 'This may be a temporary issue with the OpenCode instance. Try running the command again.',
+						cause
+					});
 				});
 
 				if (session.error)
-					throw new AgentError({ message: 'Failed to create session', cause: session.error });
+					throw new AgentError({
+						message: 'Failed to create session',
+						hint: 'The OpenCode server returned an error. Try running the command again.',
+						cause: session.error
+					});
 
 				const sessionID = session.data?.id;
 				if (!sessionID) {
 					throw new AgentError({
-						message: 'Failed to create session',
+						message: 'Failed to create session - no session ID returned',
+						hint: 'This is unexpected. Try running the command again or check for btca updates.',
 						cause: new Error('Missing session id')
 					});
 				}
@@ -277,6 +324,7 @@ export namespace Agent {
 								const props: any = event.properties;
 								throw new AgentError({
 									message: props?.error?.name ?? 'Unknown session error',
+									hint: 'An error occurred during the AI session. Try running the command again or simplify your question.',
 									cause: props?.error
 								});
 							}

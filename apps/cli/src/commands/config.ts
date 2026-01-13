@@ -5,8 +5,23 @@ import {
 	getResources,
 	updateModel,
 	addResource,
-	removeResource
+	removeResource,
+	BtcaError
 } from '../client/index.ts';
+
+/**
+ * Format an error for display, including hint if available.
+ */
+function formatError(error: unknown): string {
+	if (error instanceof BtcaError) {
+		let output = `Error: ${error.message}`;
+		if (error.hint) {
+			output += `\n\nHint: ${error.hint}`;
+		}
+		return output;
+	}
+	return `Error: ${error instanceof Error ? error.message : String(error)}`;
+}
 
 // Model subcommand
 const modelCommand = new Command('model')
@@ -34,7 +49,7 @@ const modelCommand = new Command('model')
 
 			server.stop();
 		} catch (error) {
-			console.error('Error:', error instanceof Error ? error.message : String(error));
+			console.error(formatError(error));
 			process.exit(1);
 		}
 	});
@@ -79,7 +94,7 @@ const resourcesListCommand = new Command('list')
 
 			server.stop();
 		} catch (error) {
-			console.error('Error:', error instanceof Error ? error.message : String(error));
+			console.error(formatError(error));
 			process.exit(1);
 		}
 	});
@@ -111,6 +126,9 @@ const resourcesAddCommand = new Command('add')
 			if (type === 'git') {
 				if (!options.url) {
 					console.error('Error: --url is required for git resources');
+					console.error(
+						'\nHint: Use --url to specify the GitHub repository URL (e.g., https://github.com/user/repo).'
+					);
 					process.exit(1);
 				}
 				await addResource(server.url, {
@@ -125,6 +143,7 @@ const resourcesAddCommand = new Command('add')
 			} else if (type === 'local') {
 				if (!options.path) {
 					console.error('Error: --path is required for local resources');
+					console.error('\nHint: Use --path to specify the local directory path.');
 					process.exit(1);
 				}
 				await addResource(server.url, {
@@ -136,12 +155,15 @@ const resourcesAddCommand = new Command('add')
 				console.log(`Added local resource: ${options.name}`);
 			} else {
 				console.error('Error: --type must be "git" or "local"');
+				console.error(
+					'\nHint: Use -t git for GitHub repositories or -t local for local directories.'
+				);
 				process.exit(1);
 			}
 
 			server.stop();
 		} catch (error) {
-			console.error('Error:', error instanceof Error ? error.message : String(error));
+			console.error(formatError(error));
 			process.exit(1);
 		}
 	});
@@ -167,7 +189,7 @@ const resourcesRemoveCommand = new Command('remove')
 
 			server.stop();
 		} catch (error) {
-			console.error('Error:', error instanceof Error ? error.message : String(error));
+			console.error(formatError(error));
 			process.exit(1);
 		}
 	});

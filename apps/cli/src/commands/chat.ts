@@ -1,7 +1,21 @@
 import { Command } from 'commander';
 import { spawn } from 'bun';
 import { ensureServer } from '../server/manager.ts';
-import { createClient, getResources, getOpencodeInstance } from '../client/index.ts';
+import { createClient, getResources, getOpencodeInstance, BtcaError } from '../client/index.ts';
+
+/**
+ * Format an error for display, including hint if available.
+ */
+function formatError(error: unknown): string {
+	if (error instanceof BtcaError) {
+		let output = `Error: ${error.message}`;
+		if (error.hint) {
+			output += `\n\nHint: ${error.hint}`;
+		}
+		return output;
+	}
+	return `Error: ${error instanceof Error ? error.message : String(error)}`;
+}
 
 export const chatCommand = new Command('chat')
 	.description('Start an interactive OpenCode TUI session for resources')
@@ -40,8 +54,8 @@ export const chatCommand = new Command('chat')
 
 			console.log(`Starting OpenCode TUI (${model.provider}/${model.model})...\n`);
 
-		// Spawn opencode CLI and attach to the server URL
-		const proc = spawn(['opencode', 'attach', opencodeUrl], {
+			// Spawn opencode CLI and attach to the server URL
+			const proc = spawn(['opencode', 'attach', opencodeUrl], {
 				stdin: 'inherit',
 				stdout: 'inherit',
 				stderr: 'inherit'
@@ -51,7 +65,7 @@ export const chatCommand = new Command('chat')
 
 			server.stop();
 		} catch (error) {
-			console.error('Error:', error instanceof Error ? error.message : String(error));
+			console.error(formatError(error));
 			process.exit(1);
 		}
 	});

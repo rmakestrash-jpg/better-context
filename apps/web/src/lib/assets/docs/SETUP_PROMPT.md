@@ -33,7 +33,7 @@ After scanning, show me the **complete list** of suggested resources in a simple
 Found these dependencies that would benefit from btca:
 
 1. svelte - Svelte framework docs and source
-2. tailwind - Tailwind CSS documentation  
+2. tailwind - Tailwind CSS documentation
 3. effect - Effect-TS library docs
 4. drizzleOrm - Drizzle ORM documentation
 ... etc
@@ -44,6 +44,7 @@ Does this list look good, or would you like to add/remove any?
 ```
 
 **Wait for my confirmation before proceeding.** I might say:
+
 - "Looks good" - proceed with all
 - "Remove X and Y" - exclude those
 - "Add Z" - include additional ones
@@ -81,6 +82,7 @@ Once I approve the resource list, prepare the full `btca.config.jsonc` with sens
 Ask: "Here's the config I'll create. Want me to change anything before I write it?"
 
 **Wait for approval** before creating files. I might want to:
+
 - Change a repo URL
 - Adjust a searchPath
 - Add specialNotes
@@ -119,6 +121,7 @@ Check if an `AGENTS.md` file exists in the project root:
 Add or update this section based on the chosen mode:
 
 **For "eager" mode:**
+
 ```markdown
 ## btca
 
@@ -140,6 +143,7 @@ btca ask -r svelte -r effect -q "How do I integrate Effect with Svelte?"
 ```
 
 **For "ask" mode:**
+
 ```markdown
 ## btca
 
@@ -161,6 +165,7 @@ btca ask -r svelte -r effect -q "How do I integrate Effect with Svelte?"
 ```
 
 **For "lazy" mode:**
+
 ```markdown
 ## btca
 
