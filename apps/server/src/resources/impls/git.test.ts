@@ -113,7 +113,7 @@ describe('Git Resource', () => {
 				quiet: true
 			};
 
-			expect(loadGitResource(args)).rejects.toThrow('Invalid path');
+			expect(loadGitResource(args)).rejects.toThrow('Invalid search path');
 		});
 	});
 });
