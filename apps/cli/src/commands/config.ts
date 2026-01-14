@@ -186,15 +186,22 @@ const resourcesAddCommand = new Command('add')
 					);
 					process.exit(1);
 				}
-				await addResource(server.url, {
+				const inputUrl = options.url as string;
+				const added = await addResource(server.url, {
 					type: 'git',
 					name: options.name as string,
-					url: options.url as string,
+					url: inputUrl,
 					branch: (options.branch as string) ?? 'main',
 					...(options.searchPath && { searchPath: options.searchPath as string }),
 					...(options.notes && { specialNotes: options.notes as string })
 				});
-				console.log(`Added git resource: ${options.name}`);
+				// Show normalized URL if it differs from input
+				if (added.type === 'git' && added.url !== inputUrl) {
+					console.log(`Added git resource: ${options.name}`);
+					console.log(`  URL normalized: ${added.url}`);
+				} else {
+					console.log(`Added git resource: ${options.name}`);
+				}
 			} else if (type === 'local') {
 				if (!options.path) {
 					console.error('Error: --path is required for local resources');
