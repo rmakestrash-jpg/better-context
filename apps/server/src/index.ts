@@ -461,7 +461,8 @@ export const startServer = async (options: StartServerOptions = {}): Promise<Ser
 
 	const server = Bun.serve({
 		port: requestedPort,
-		fetch: app.fetch
+		fetch: app.fetch,
+		idleTimeout: 60
 	});
 
 	const actualPort = server.port ?? requestedPort;
