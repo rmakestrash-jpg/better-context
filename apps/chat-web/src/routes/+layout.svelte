@@ -17,7 +17,7 @@
 	<meta name="description" content="Web-based chat interface for btca" />
 </svelte:head>
 
-<div class="relative flex min-h-dvh flex-col overflow-hidden">
+<div class="relative flex h-dvh flex-col overflow-hidden">
 	<div aria-hidden="true" class="bc-appBg pointer-events-none absolute inset-0 -z-10"></div>
 
 	<header class="bc-header sticky top-0 z-20">
@@ -61,7 +61,7 @@
 		</div>
 	</header>
 
-	<main id="main" class="flex flex-1 flex-col">
+	<main id="main" class="flex min-h-0 flex-1 flex-col">
 		{@render children()}
 	</main>
 </div>

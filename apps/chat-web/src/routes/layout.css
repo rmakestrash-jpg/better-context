@@ -272,7 +272,6 @@
 		flex-direction: column;
 		gap: 16px;
 		overflow-y: auto;
-		flex: 1;
 		padding: 20px;
 		max-width: 800px;
 		margin: 0 auto;
@@ -306,7 +305,7 @@
 		padding: 16px 20px;
 		border-top: 1px solid hsl(var(--bc-border));
 		background: hsl(var(--bc-bg));
-		max-width: 800px;
+		max-width: 64rem;
 		margin: 0 auto;
 		width: 100%;
 	}
@@ -443,15 +442,16 @@
 	/* Code block wrapper with copy button */
 	.code-block-wrapper {
 		border: 1px solid hsl(var(--bc-border));
+		background: hsl(var(--bc-surface));
 		margin: 12px 0;
+		overflow: hidden;
 	}
 
 	.code-block-header {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 6px 12px;
-		background: hsl(var(--bc-surface-2));
+		padding: 8px 12px;
 		border-bottom: 1px solid hsl(var(--bc-border));
 		font-size: 12px;
 	}
@@ -460,6 +460,7 @@
 		color: hsl(var(--bc-fg-muted));
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
+		font-weight: 600;
 	}
 
 	.copy-btn {
@@ -476,44 +477,42 @@
 	}
 
 	.copy-btn:hover {
-		background: hsl(var(--bc-surface));
+		background: hsl(var(--bc-surface-2));
 		color: hsl(var(--bc-fg));
 		border-color: hsl(var(--bc-fg-muted));
 	}
 
 	.code-content {
 		overflow-x: auto;
+		padding: 12px 14px;
 	}
 
-	.code-content pre.shiki {
-		margin: 0;
-		padding: 12px 14px;
-		border: none;
-		font-size: 13px;
+	/* Shiki code blocks - match web app style */
+	pre.shiki,
+	pre.shiki code {
+		font-family: var(--font-family-geist-mono);
+		font-size: 18px;
 		line-height: 1.6;
 	}
 
-	/* Shiki theme handling */
-	.code-content pre.shiki.shiki-themes {
-		background-color: var(--shiki-light-bg, hsl(var(--bc-surface)));
+	pre.shiki {
+		background: transparent !important;
+		margin: 0;
+		padding: 0;
 	}
 
-	:root.dark .code-content pre.shiki.shiki-themes {
-		background-color: var(--shiki-dark-bg, hsl(var(--bc-surface)));
-	}
-
-	.code-content pre.shiki code {
+	pre.shiki code {
 		padding: 0;
 		border: none;
 		background: transparent;
-		font-size: inherit;
 	}
 
-	.code-content pre.shiki span {
+	/* Shiki dual theme handling */
+	pre.shiki span {
 		color: var(--shiki-light, inherit);
 	}
 
-	:root.dark .code-content pre.shiki span {
+	:root.dark pre.shiki span {
 		color: var(--shiki-dark, inherit);
 	}
 
