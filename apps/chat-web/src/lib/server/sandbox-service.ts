@@ -12,7 +12,8 @@ let daytonaInstance: Daytona | null = null;
 const BTCA_SNAPSHOT_NAME = 'btca-sandbox';
 
 // Auto-stop interval in minutes (sandbox stops after this period of inactivity)
-const AUTO_STOP_INTERVAL = 5;
+export const SANDBOX_IDLE_MINUTES = 2;
+const AUTO_STOP_INTERVAL = SANDBOX_IDLE_MINUTES;
 
 // Server port for btca serve
 const BTCA_SERVER_PORT = 3000;
@@ -272,31 +273,20 @@ export async function stopOtherSandboxes(
 }
 
 /**
- * Ensure a sandbox is ready for a thread.
- * - If thread has no sandbox, create one
- * - If sandbox exists but is stopped, start it
- * - If sandbox exists and is running, return its URL
- *
- * Returns the server URL to use for requests.
+ * Ensure a sandbox is ready and optionally persist sandboxId when created.
  */
-export async function ensureSandboxReady(
-	threadId: Id<'threads'>,
-	sandboxId: string | undefined,
-	resources: ResourceConfig[],
-	onStatus?: (status: SandboxStatus) => void
-): Promise<string> {
-	const convex = getConvexClient();
+export async function ensureSandboxReadyForRecord(args: {
+	sandboxId: string | undefined;
+	resources: ResourceConfig[];
+	onStatus?: (status: SandboxStatus) => void;
+	onPersist: (sandboxId: string) => Promise<void>;
+}): Promise<string> {
+	const { sandboxId, resources, onStatus, onPersist } = args;
 
 	// No sandbox exists - create one
 	if (!sandboxId) {
 		const result = await createSandbox(resources, onStatus);
-
-		// Save sandbox ID to thread
-		await convex.mutation(api.threads.setSandboxId, {
-			threadId,
-			sandboxId: result.sandboxId
-		});
-
+		await onPersist(result.sandboxId);
 		return result.serverUrl;
 	}
 
@@ -315,12 +305,35 @@ export async function ensureSandboxReady(
 
 	// Unknown state - sandbox may have been deleted, create a new one
 	const result = await createSandbox(resources, onStatus);
-
-	// Update sandbox ID in thread
-	await convex.mutation(api.threads.setSandboxId, {
-		threadId,
-		sandboxId: result.sandboxId
-	});
-
+	await onPersist(result.sandboxId);
 	return result.serverUrl;
+}
+
+/**
+ * Ensure a sandbox is ready for a thread.
+ * - If thread has no sandbox, create one
+ * - If sandbox exists but is stopped, start it
+ * - If sandbox exists and is running, return its URL
+ *
+ * Returns the server URL to use for requests.
+ */
+export async function ensureSandboxReady(
+	threadId: Id<'threads'>,
+	sandboxId: string | undefined,
+	resources: ResourceConfig[],
+	onStatus?: (status: SandboxStatus) => void
+): Promise<string> {
+	const convex = getConvexClient();
+
+	return ensureSandboxReadyForRecord({
+		sandboxId,
+		resources,
+		onStatus,
+		onPersist: async (newSandboxId) => {
+			await convex.mutation(api.threads.setSandboxId, {
+				threadId,
+				sandboxId: newSandboxId
+			});
+		}
+	});
 }
