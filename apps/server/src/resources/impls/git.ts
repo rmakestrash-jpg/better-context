@@ -4,11 +4,28 @@ import path from 'node:path';
 import { Metrics } from '../../metrics/index.ts';
 import { CommonHints } from '../../errors.ts';
 import { ResourceError } from '../helpers.ts';
+import { GitResourceSchema } from '../schema.ts';
 import type { BtcaFsResource, BtcaGitResourceArgs } from '../types.ts';
 
-const isValidGitUrl = (url: string) => /^https:\/\//.test(url);
-const isValidBranch = (branch: string) => /^[\w\-./]+$/.test(branch);
-const isValidPath = (path: string) => !path.includes('..') && /^[\w\-./]*$/.test(path);
+const validateGitUrl = (url: string): { success: true } | { success: false; error: string } => {
+	const result = GitResourceSchema.shape.url.safeParse(url);
+	if (result.success) return { success: true };
+	return { success: false, error: result.error.errors[0]?.message ?? 'Invalid git URL' };
+};
+
+const validateBranch = (branch: string): { success: true } | { success: false; error: string } => {
+	const result = GitResourceSchema.shape.branch.safeParse(branch);
+	if (result.success) return { success: true };
+	return { success: false, error: result.error.errors[0]?.message ?? 'Invalid branch name' };
+};
+
+const validateSearchPath = (
+	searchPath: string
+): { success: true } | { success: false; error: string } => {
+	const result = GitResourceSchema.shape.searchPath.safeParse(searchPath);
+	if (result.success) return { success: true };
+	return { success: false, error: result.error.errors[0]?.message ?? 'Invalid search path' };
+};
 
 const directoryExists = async (path: string): Promise<boolean> => {
 	try {
@@ -178,24 +195,27 @@ const gitClone = async (args: {
 	localAbsolutePath: string;
 	quiet: boolean;
 }) => {
-	if (!isValidGitUrl(args.repoUrl)) {
+	const urlValidation = validateGitUrl(args.repoUrl);
+	if (!urlValidation.success) {
 		throw new ResourceError({
-			message: 'Invalid git URL format',
-			hint: 'URLs must start with "https://". Example: https://github.com/user/repo',
+			message: urlValidation.error,
+			hint: 'URLs must be valid HTTPS URLs. Example: https://github.com/user/repo',
 			cause: new Error('URL validation failed')
 		});
 	}
-	if (!isValidBranch(args.repoBranch)) {
+	const branchValidation = validateBranch(args.repoBranch);
+	if (!branchValidation.success) {
 		throw new ResourceError({
-			message: `Invalid branch name: "${args.repoBranch}"`,
+			message: branchValidation.error,
 			hint: 'Branch names can only contain letters, numbers, hyphens, underscores, dots, and forward slashes.',
 			cause: new Error('Branch validation failed')
 		});
 	}
 	for (const repoSubPath of args.repoSubPaths) {
-		if (!isValidPath(repoSubPath)) {
+		const pathValidation = validateSearchPath(repoSubPath);
+		if (!pathValidation.success) {
 			throw new ResourceError({
-				message: `Invalid search path: "${repoSubPath}"`,
+				message: pathValidation.error,
 				hint: 'Search paths cannot contain ".." (path traversal) and must use only safe characters.',
 				cause: new Error('Path validation failed')
 			});

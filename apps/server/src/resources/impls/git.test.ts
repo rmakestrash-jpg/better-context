@@ -83,7 +83,7 @@ describe('Git Resource', () => {
 				quiet: true
 			};
 
-			expect(loadGitResource(args)).rejects.toThrow('Invalid git URL');
+			expect(loadGitResource(args)).rejects.toThrow('Git URL must be a valid HTTPS URL');
 		});
 
 		it('throws error for invalid branch name', async () => {
@@ -98,7 +98,7 @@ describe('Git Resource', () => {
 				quiet: true
 			};
 
-			expect(loadGitResource(args)).rejects.toThrow('Invalid branch name');
+			expect(loadGitResource(args)).rejects.toThrow('Branch name must contain only');
 		});
 
 		it('throws error for path traversal attempt', async () => {
@@ -113,7 +113,7 @@ describe('Git Resource', () => {
 				quiet: true
 			};
 
-			expect(loadGitResource(args)).rejects.toThrow('Invalid search path');
+			expect(loadGitResource(args)).rejects.toThrow('path traversal');
 		});
 	});
 });
