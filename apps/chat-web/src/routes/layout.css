@@ -291,8 +291,7 @@
 
 	.chat-message-assistant {
 		background: transparent;
-		padding-left: 0;
-		padding-right: 0;
+		padding: 6px 0;
 	}
 
 	.chat-message-system {
@@ -474,7 +473,7 @@
 	.code-block-wrapper {
 		border: 1px solid hsl(var(--bc-border));
 		background: hsl(var(--bc-surface));
-		margin: 12px 0;
+		margin: 6px 0;
 		overflow: hidden;
 	}
 
@@ -482,7 +481,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 8px 12px;
+		padding: 4px 8px;
 		border-bottom: 1px solid hsl(var(--bc-border));
 		font-size: 12px;
 	}
@@ -515,15 +514,15 @@
 
 	.code-content {
 		overflow-x: auto;
-		padding: 12px 14px;
+		padding: 4px 6px;
 	}
 
 	/* Shiki code blocks - match web app style */
 	pre.shiki,
 	pre.shiki code {
 		font-family: var(--font-family-geist-mono);
-		font-size: 18px;
-		line-height: 1.6;
+		font-size: 14px;
+		line-height: 1.4;
 	}
 
 	pre.shiki {
@@ -556,6 +555,12 @@
 		font-size: 13px;
 		line-height: 1.6;
 		margin: 12px 0;
+	}
+
+	.prose :where(pre):not(:where([class~='not-prose'], [class~='not-prose'] *)) {
+		margin-top: 2px !important;
+		margin-bottom: 2px !important;
+		padding: 1 !important;
 	}
 
 	.prose pre code {
