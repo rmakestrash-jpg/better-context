@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 import { z } from 'zod';
 import { CommonHints, type TaggedErrorOptions } from '../errors.ts';
@@ -10,7 +11,6 @@ export const GLOBAL_CONFIG_FILENAME = 'btca.config.jsonc';
 export const LEGACY_CONFIG_FILENAME = 'btca.json';
 export const GLOBAL_DATA_DIR = '~/.local/share/btca';
 export const PROJECT_CONFIG_FILENAME = 'btca.config.jsonc';
-export const PROJECT_DATA_DIR = '.btca';
 export const CONFIG_SCHEMA_URL = 'https://btca.dev/btca.schema.json';
 
 export const DEFAULT_MODEL = 'claude-haiku-4-5';
@@ -48,6 +48,7 @@ export const DEFAULT_RESOURCES: ResourceDefinition[] = [
 
 const StoredConfigSchema = z.object({
 	$schema: z.string().optional(),
+	dataDirectory: z.string().optional(),
 	resources: z.array(ResourceDefinitionSchema),
 	model: z.string(),
 	provider: z.string()
@@ -125,6 +126,12 @@ export namespace Config {
 		const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
 		if (path.startsWith('~/')) return home + path.slice(1);
 		return path;
+	};
+
+	const resolveDataDirectory = (rawPath: string, baseDir: string): string => {
+		const expanded = expandHome(rawPath);
+		if (path.isAbsolute(expanded)) return expanded;
+		return path.resolve(baseDir, expanded);
 	};
 
 	const stripJsonc = (content: string): string => {
@@ -680,7 +687,7 @@ export namespace Config {
 		const projectExists = await Bun.file(projectConfigPath).exists();
 		if (projectExists) {
 			Metrics.info('config.load.project', { source: 'project', path: projectConfigPath });
-			const projectConfig = await loadConfigFromPath(projectConfigPath);
+			let projectConfig = await loadConfigFromPath(projectConfigPath);
 
 			Metrics.info('config.load.merged', {
 				globalResources: globalConfig.resources.length,
@@ -689,22 +696,50 @@ export namespace Config {
 
 			// Use project paths for data storage when project config exists
 			// Pass both configs separately to avoid resource leakage on mutations
+			let projectDataDir =
+				projectConfig.dataDirectory ?? globalConfig.dataDirectory ?? expandHome(GLOBAL_DATA_DIR);
+
+			// Migration: if no dataDirectory is set and legacy .btca exists, use it and update config
+			if (!projectConfig.dataDirectory) {
+				const legacyProjectDataDir = `${cwd}/.btca`;
+				const legacyExists = await fs
+					.stat(legacyProjectDataDir)
+					.then(() => true)
+					.catch(() => false);
+				if (legacyExists) {
+					Metrics.info('config.project.legacy_data_dir', {
+						path: legacyProjectDataDir,
+						action: 'migrating'
+					});
+					projectDataDir = '.btca';
+					const updatedProjectConfig = { ...projectConfig, dataDirectory: '.btca' };
+					await saveConfig(projectConfigPath, updatedProjectConfig);
+					projectConfig = updatedProjectConfig;
+				}
+			}
+
+			const resolvedProjectDataDir = resolveDataDirectory(projectDataDir, cwd);
 			return makeService(
 				globalConfig,
 				projectConfig,
-				`${cwd}/${PROJECT_DATA_DIR}/resources`,
-				`${cwd}/${PROJECT_DATA_DIR}/collections`,
+				`${resolvedProjectDataDir}/resources`,
+				`${resolvedProjectDataDir}/collections`,
 				projectConfigPath
 			);
 		}
 
 		// No project config, use global only
 		Metrics.info('config.load.source', { source: 'global', path: globalConfigPath });
+		const globalDataDir = globalConfig.dataDirectory ?? expandHome(GLOBAL_DATA_DIR);
+		const resolvedGlobalDataDir = resolveDataDirectory(
+			globalDataDir,
+			expandHome(GLOBAL_CONFIG_DIR)
+		);
 		return makeService(
 			globalConfig,
 			null,
-			`${expandHome(GLOBAL_DATA_DIR)}/resources`,
-			`${expandHome(GLOBAL_DATA_DIR)}/collections`,
+			`${resolvedGlobalDataDir}/resources`,
+			`${resolvedGlobalDataDir}/collections`,
 			globalConfigPath
 		);
 	};
