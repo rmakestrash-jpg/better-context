@@ -90,6 +90,29 @@ async function waitForBtcaServer(sandbox: Sandbox, maxRetries = 15): Promise<boo
 	return false;
 }
 
+const normalizeResourceNames = (names: string[]) =>
+	[...new Set(names)].sort((a, b) => a.localeCompare(b));
+
+async function fetchSandboxResourceNames(serverUrl: string): Promise<string[] | null> {
+	try {
+		const response = await fetch(`${serverUrl}/resources`);
+		if (!response.ok) return null;
+		const data = (await response.json()) as { resources?: { name: string }[] };
+		if (!data?.resources) return null;
+		return data.resources.map((resource) => resource.name);
+	} catch {
+		return null;
+	}
+}
+
+function resourcesMatch(expected: string[], actual: string[] | null): boolean {
+	if (!actual) return false;
+	const expectedNormalized = normalizeResourceNames(expected);
+	const actualNormalized = normalizeResourceNames(actual);
+	if (expectedNormalized.length !== actualNormalized.length) return false;
+	return expectedNormalized.every((name, index) => name === actualNormalized[index]);
+}
+
 /**
  * Get sandbox state and server URL from Daytona
  */
@@ -179,6 +202,7 @@ async function createSandbox(
  */
 async function startSandbox(
 	sandboxId: string,
+	resources: ResourceConfig[],
 	onStatus?: (status: SandboxStatus) => void
 ): Promise<string> {
 	const daytona = getDaytona();
@@ -187,6 +211,10 @@ async function startSandbox(
 
 	const sandbox = await daytona.get(sandboxId);
 	await sandbox.start(60); // 60 second timeout
+
+	// Re-upload config in case resources changed while stopped
+	const btcaConfig = generateBtcaConfig(resources);
+	await sandbox.fs.uploadFile(Buffer.from(btcaConfig), '/root/btca.config.jsonc');
 
 	// Re-start the btca server (it won't be running after stop)
 	const sandboxSessionId = 'btca-server-session';
@@ -294,13 +322,23 @@ export async function ensureSandboxReadyForRecord(args: {
 	const info = await getSandboxInfo(sandboxId);
 
 	if (info.state === 'started' && info.serverUrl) {
-		onStatus?.('ready');
-		return info.serverUrl;
+		const desiredResourceNames = resources.map((resource) => resource.name);
+		const currentResources = await fetchSandboxResourceNames(info.serverUrl);
+		if (resourcesMatch(desiredResourceNames, currentResources)) {
+			onStatus?.('ready');
+			return info.serverUrl;
+		}
+
+		// Resources changed; rebuild sandbox to refresh config
+		await deleteSandbox(sandboxId);
+		const result = await createSandbox(resources, onStatus);
+		await onPersist(result.sandboxId);
+		return result.serverUrl;
 	}
 
 	if (info.state === 'stopped') {
 		// Start the stopped sandbox
-		return await startSandbox(sandboxId, onStatus);
+		return await startSandbox(sandboxId, resources, onStatus);
 	}
 
 	// Unknown state - sandbox may have been deleted, create a new one
