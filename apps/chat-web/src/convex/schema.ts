@@ -126,5 +126,19 @@ export default defineSchema({
 	threadResources: defineTable({
 		threadId: v.id('threads'),
 		resourceName: v.string()
-	}).index('by_thread', ['threadId'])
+	}).index('by_thread', ['threadId']),
+
+	streamSessions: defineTable({
+		threadId: v.id('threads'),
+		messageId: v.id('messages'),
+		sessionId: v.string(),
+		status: v.union(v.literal('streaming'), v.literal('done'), v.literal('error')),
+		startedAt: v.number(),
+		completedAt: v.optional(v.number()),
+		error: v.optional(v.string())
+	})
+		.index('by_thread', ['threadId'])
+		.index('by_message', ['messageId'])
+		.index('by_session', ['sessionId'])
+		.index('by_status', ['status'])
 });

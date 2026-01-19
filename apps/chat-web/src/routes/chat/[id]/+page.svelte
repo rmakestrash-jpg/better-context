@@ -40,6 +40,8 @@
 	let streamStatus = $state<string | null>(null);
 	let cancelState = $state<CancelState>('none');
 	let inputValue = $state('');
+	let currentSessionId = $state<string | null>(null);
+	let hasCheckedForActiveStream = $state(false);
 
 	// Pending message shown immediately while waiting for stream
 	let pendingUserMessage = $state<{ content: string; resources: string[] } | null>(null);
@@ -78,6 +80,150 @@
 			inputEl.focus();
 		}
 	});
+
+	// Check for active stream on mount/thread change
+	$effect(() => {
+		if (!threadId || !auth.isSignedIn || isStreaming || hasCheckedForActiveStream) return;
+
+		const checkActiveStream = async () => {
+			try {
+				const token = await auth.clerk?.session?.getToken({ template: 'convex' });
+				if (!token) return;
+
+				const response = await fetch(
+					`${convexHttpBaseUrl}/chat/stream/active?threadId=${threadId}`,
+					{
+						headers: { Authorization: `Bearer ${token}` }
+					}
+				);
+
+				if (!response.ok) return;
+
+				const data = (await response.json()) as {
+					active: boolean;
+					sessionId?: string;
+					messageId?: string;
+					chunkCount?: number;
+				};
+
+				if (data.active && data.sessionId) {
+					resumeStream(data.sessionId, 0);
+				}
+			} catch (error) {
+				console.error('Failed to check for active stream:', error);
+			} finally {
+				hasCheckedForActiveStream = true;
+			}
+		};
+
+		checkActiveStream();
+	});
+
+	// Reset check flag when thread changes
+	$effect(() => {
+		threadId;
+		hasCheckedForActiveStream = false;
+	});
+
+	async function resumeStream(sessionId: string, cursor: number) {
+		isStreaming = true;
+		streamStatus = 'resuming';
+		currentSessionId = sessionId;
+		currentChunks = [];
+		abortController = new AbortController();
+		let shouldRefreshUsage = false;
+
+		try {
+			const token = await auth.clerk?.session?.getToken({ template: 'convex' });
+			if (!token) {
+				throw new Error('Missing auth token');
+			}
+
+			const response = await fetch(`${convexHttpBaseUrl}/chat/stream/resume`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				},
+				body: JSON.stringify({ sessionId, cursor }),
+				signal: abortController.signal
+			});
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new Error(errorText || 'Failed to resume stream');
+			}
+			if (!response.body) throw new Error('No response body');
+
+			streamStatus = null;
+
+			const reader = response.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = '';
+
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split('\n');
+				buffer = lines.pop() ?? '';
+
+				let eventData = '';
+				for (const line of lines) {
+					if (line.startsWith('data: ')) {
+						eventData = line.slice(6);
+					} else if (line === '' && eventData) {
+						try {
+							const event = JSON.parse(eventData) as
+								| { type: 'add'; chunk: BtcaChunk }
+								| { type: 'update'; id: string; chunk: Partial<BtcaChunk> }
+								| { type: 'done' }
+								| { type: 'error'; error: string };
+
+							if (event.type === 'add') {
+								const exists = currentChunks.some((c) => c.id === event.chunk.id);
+								if (!exists) {
+									currentChunks = [...currentChunks, event.chunk];
+								}
+							} else if (event.type === 'update') {
+								const exists = currentChunks.some((c) => c.id === event.id);
+								if (exists) {
+									currentChunks = currentChunks.map((c) => {
+										if (c.id !== event.id) return c;
+										return { ...c, ...event.chunk } as BtcaChunk;
+									});
+								}
+							} else if (event.type === 'error') {
+								throw new Error(event.error);
+							} else if (event.type === 'done') {
+								shouldRefreshUsage = true;
+							}
+						} catch (e) {
+							if (!(e instanceof SyntaxError)) throw e;
+						}
+						eventData = '';
+					}
+				}
+			}
+
+			reader.releaseLock();
+		} catch (error) {
+			if ((error as Error).name !== 'AbortError') {
+				console.error('Resume stream error:', error);
+			}
+		} finally {
+			isStreaming = false;
+			streamStatus = null;
+			cancelState = 'none';
+			currentChunks = [];
+			currentSessionId = null;
+			abortController = null;
+			if (shouldRefreshUsage) {
+				void billingStore.refetch();
+			}
+		}
+	}
 
 	async function clearChat() {
 		if (!threadId) return;
@@ -243,6 +389,7 @@
 								| { type: 'add'; chunk: BtcaChunk }
 								| { type: 'update'; id: string; chunk: Partial<BtcaChunk> }
 								| { type: 'status'; status: string }
+								| { type: 'session'; sessionId: string }
 								| { type: 'done' }
 								| { type: 'error'; error: string };
 
@@ -251,11 +398,16 @@
 								pendingUserMessage = null;
 							}
 
-							if (event.type === 'status') {
+							if (event.type === 'session') {
+								currentSessionId = event.sessionId;
+							} else if (event.type === 'status') {
 								streamStatus = event.status;
 							} else if (event.type === 'add') {
 								streamStatus = null;
-								currentChunks = [...currentChunks, event.chunk];
+								const exists = currentChunks.some((c) => c.id === event.chunk.id);
+								if (!exists) {
+									currentChunks = [...currentChunks, event.chunk];
+								}
 							} else if (event.type === 'update') {
 								currentChunks = currentChunks.map((c) => {
 									if (c.id !== event.id) return c;
@@ -276,9 +428,15 @@
 
 			reader.releaseLock();
 		} catch (error) {
-			if ((error as Error).name === 'AbortError') {
+			const err = error as Error;
+			const isAbortOrNetwork =
+				err.name === 'AbortError' ||
+				err.message === 'Failed to fetch' ||
+				err.message === 'network error' ||
+				err.message === 'Load failed';
+
+			if (isAbortOrNetwork) {
 				shouldRefreshUsage = true;
-				// Request was canceled - Convex subscription will update UI
 			} else {
 				console.error('Chat error:', error);
 				alert(error instanceof Error ? error.message : 'Chat request failed');
@@ -289,6 +447,7 @@
 			cancelState = 'none';
 			currentChunks = [];
 			pendingUserMessage = null;
+			currentSessionId = null;
 			abortController = null;
 			if (shouldRefreshUsage) {
 				void billingStore.refetch();
