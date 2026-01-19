@@ -537,15 +537,17 @@ type SyncResult = {
 	cachedResources: CachedResourceInfo[];
 };
 
+const RESOURCES_DIR = '/root/.local/share/btca/resources';
+
 async function getSandboxStatus(sandbox: Sandbox): Promise<SyncResult> {
 	const duResult = await sandbox.process.executeCommand(
-		'du -sb /root/.btca/resources 2>/dev/null || echo "0"'
+		`du -sb ${RESOURCES_DIR} 2>/dev/null || echo "0"`
 	);
 	const duMatch = duResult.result.trim().match(/^(\d+)/);
 	const storageUsedBytes = duMatch ? parseInt(duMatch[1], 10) : 0;
 
 	const lsResult = await sandbox.process.executeCommand(
-		'ls -1 /root/.btca/resources 2>/dev/null || echo ""'
+		`ls -1 ${RESOURCES_DIR} 2>/dev/null || echo ""`
 	);
 	const resourceDirs = lsResult.result
 		.trim()
@@ -555,7 +557,7 @@ async function getSandboxStatus(sandbox: Sandbox): Promise<SyncResult> {
 	const cachedResources: CachedResourceInfo[] = [];
 
 	for (const dir of resourceDirs) {
-		const gitConfigPath = `/root/.btca/resources/${dir}/.git/config`;
+		const gitConfigPath = `${RESOURCES_DIR}/${dir}/.git/config`;
 		const gitConfigResult = await sandbox.process.executeCommand(
 			`cat "${gitConfigPath}" 2>/dev/null || echo ""`
 		);
@@ -574,7 +576,7 @@ async function getSandboxStatus(sandbox: Sandbox): Promise<SyncResult> {
 		}
 
 		const sizeResult = await sandbox.process.executeCommand(
-			`du -sb "/root/.btca/resources/${dir}" 2>/dev/null || echo "0"`
+			`du -sb "${RESOURCES_DIR}/${dir}" 2>/dev/null || echo "0"`
 		);
 		const sizeMatch = sizeResult.result.trim().match(/^(\d+)/);
 		const sizeBytes = sizeMatch ? parseInt(sizeMatch[1], 10) : undefined;
