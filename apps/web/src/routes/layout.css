@@ -23,7 +23,7 @@
 	--font-family-geist-mono:
 		'GeistMono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
 		'Courier New', monospace;
-	--font-family-ui: var(--font-family-geist-mono);
+	--font-family-ui: var(--font-family-geist);
 }
 
 @layer base {
@@ -652,8 +652,8 @@
 		inset: 0;
 		padding: 12px 14px;
 		border: 1px solid transparent;
-		font-size: 14px;
-		font-family: var(--font-family-geist-mono);
+		font-size: 15px;
+		font-family: var(--font-family-ui);
 		line-height: 1.5;
 		white-space: pre-wrap;
 		word-wrap: break-word;
@@ -675,8 +675,8 @@
 		background: transparent;
 		color: hsl(var(--bc-fg));
 		caret-color: hsl(var(--bc-fg));
-		font-size: 14px;
-		font-family: var(--font-family-geist-mono);
+		font-size: 15px;
+		font-family: var(--font-family-ui);
 		resize: none;
 		line-height: 1.5;
 		field-sizing: content;
@@ -776,7 +776,7 @@
 		--tw-prose-td-borders: hsl(var(--bc-border));
 
 		color: hsl(var(--bc-fg));
-		font-size: 13px;
+		font-size: 15px;
 		line-height: 1.8;
 	}
 
@@ -860,7 +860,7 @@
 	pre.shiki,
 	pre.shiki code {
 		font-family: var(--font-family-geist-mono);
-		font-size: 13px !important;
+		font-size: 14px !important;
 		line-height: 1.6;
 	}
 
@@ -889,7 +889,7 @@
 		border: 1px solid hsl(var(--bc-border));
 		background: hsl(var(--bc-surface));
 		overflow-x: auto;
-		font-size: 13px !important;
+		font-size: 14px !important;
 		line-height: 1.6;
 		margin: 12px 0;
 	}

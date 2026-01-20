@@ -303,11 +303,11 @@
 							<span class="text-xs font-medium text-[hsl(var(--bc-success))]">AI</span>
 						</div>
 						{#if typeof message.content === 'string'}
-							<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+							<div class="prose prose-neutral dark:prose-invert max-w-none">
 								{@html getRenderedMarkdown(message.content)}
 							</div>
 						{:else if isTextContent(message.content)}
-							<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+							<div class="prose prose-neutral dark:prose-invert max-w-none">
 								{@html getRenderedMarkdown(message.content.content)}
 							</div>
 						{:else if isChunksContent(message.content)}
@@ -324,7 +324,7 @@
 											{chunk.text}
 										</div>
 									{:else if chunk.type === 'text'}
-										<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+										<div class="prose prose-neutral dark:prose-invert max-w-none">
 											{@html getRenderedMarkdown(chunk.text)}
 										</div>
 									{/if}
@@ -417,7 +417,7 @@
 									{chunk.text}
 								</div>
 							{:else if chunk.type === 'text'}
-								<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
+								<div class="prose prose-neutral dark:prose-invert max-w-none">
 									{@html getRenderedMarkdown(chunk.text)}
 								</div>
 							{/if}
