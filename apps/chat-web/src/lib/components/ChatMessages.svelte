@@ -131,7 +131,10 @@
 			'html',
 			'css',
 			'bash',
-			'shell'
+			'shell',
+			'python',
+			'rust',
+			'go'
 		]
 	});
 
@@ -155,7 +158,13 @@
 			css: 'css',
 			bash: 'bash',
 			sh: 'shell',
-			shell: 'shell'
+			shell: 'shell',
+			python: 'python',
+			py: 'python',
+			rust: 'rust',
+			rs: 'rust',
+			go: 'go',
+			golang: 'go'
 		};
 		return langMap[lang] ?? 'text';
 	}
