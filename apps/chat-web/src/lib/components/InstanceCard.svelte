@@ -128,6 +128,19 @@
 
 	const displayedResources = $derived.by(() => instanceStore.cachedResources.slice(0, 4));
 
+	const updateSummary = $derived.by(() => {
+		const parts: string[] = [];
+		if (instanceStore.btcaUpdateAvailable) {
+			parts.push(`btca: ${instanceStore.btcaVersion} → ${instanceStore.latestBtcaVersion}`);
+		}
+		if (instanceStore.opencodeUpdateAvailable) {
+			parts.push(
+				`opencode: ${instanceStore.opencodeVersion} → ${instanceStore.latestOpencodeVersion}`
+			);
+		}
+		return parts.join(', ');
+	});
+
 	function formatBytes(bytes: number) {
 		if (!bytes) return '0 B';
 		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -202,7 +215,7 @@
 						{stateInfo.label}
 					</span>
 					{#if instanceStore.updateAvailable}
-						<span class="bc-badge bc-badge-warning">Update available</span>
+						<span class="bc-badge bc-badge-warning" title={updateSummary}>Update available</span>
 					{/if}
 				</div>
 				<ChevronDown
@@ -348,13 +361,27 @@
 					<div class="bc-card bg-[hsl(var(--bc-surface-2))] p-4">
 						<p class="bc-muted text-xs uppercase tracking-[0.2em]">Versions</p>
 						<div class="mt-3 grid gap-2 text-sm">
-							<div class="flex items-center justify-between">
+							<div class="flex items-center justify-between gap-2">
 								<span class="bc-muted">btca</span>
-								<span>{instanceStore.btcaVersion ?? 'Unknown'}</span>
+								<div class="flex items-center gap-2">
+									<span>{instanceStore.btcaVersion ?? 'Unknown'}</span>
+									{#if instanceStore.btcaUpdateAvailable}
+										<span class="text-xs text-[hsl(var(--bc-warning))]">
+											→ {instanceStore.latestBtcaVersion}
+										</span>
+									{/if}
+								</div>
 							</div>
-							<div class="flex items-center justify-between">
+							<div class="flex items-center justify-between gap-2">
 								<span class="bc-muted">opencode</span>
-								<span>{instanceStore.opencodeVersion ?? 'Unknown'}</span>
+								<div class="flex items-center gap-2">
+									<span>{instanceStore.opencodeVersion ?? 'Unknown'}</span>
+									{#if instanceStore.opencodeUpdateAvailable}
+										<span class="text-xs text-[hsl(var(--bc-warning))]">
+											→ {instanceStore.latestOpencodeVersion}
+										</span>
+									{/if}
+								</div>
 							</div>
 						</div>
 						<p class="bc-muted mt-2 text-xs">

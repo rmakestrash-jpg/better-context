@@ -53,8 +53,28 @@ class InstanceStore {
 		return this.status?.instance.opencodeVersion ?? null;
 	}
 
+	get latestBtcaVersion() {
+		return this.status?.instance.latestBtcaVersion ?? null;
+	}
+
+	get latestOpencodeVersion() {
+		return this.status?.instance.latestOpencodeVersion ?? null;
+	}
+
+	get btcaUpdateAvailable() {
+		const current = this.btcaVersion;
+		const latest = this.latestBtcaVersion;
+		return Boolean(current && latest && current !== latest);
+	}
+
+	get opencodeUpdateAvailable() {
+		const current = this.opencodeVersion;
+		const latest = this.latestOpencodeVersion;
+		return Boolean(current && latest && current !== latest);
+	}
+
 	get updateAvailable() {
-		return this.status?.instance.updateAvailable ?? false;
+		return this.btcaUpdateAvailable || this.opencodeUpdateAvailable;
 	}
 
 	get storageUsedBytes() {

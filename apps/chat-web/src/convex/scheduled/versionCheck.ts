@@ -44,14 +44,10 @@ async function updateInstance(
 	latestOpencode?: string
 ): Promise<void> {
 	try {
-		const updateAvailable = Boolean(
-			(latestBtca && instance.btcaVersion && latestBtca !== instance.btcaVersion) ||
-			(latestOpencode && instance.opencodeVersion && latestOpencode !== instance.opencodeVersion)
-		);
-
 		await ctx.runMutation(instanceMutations.setVersions, {
 			instanceId: instance._id,
-			updateAvailable,
+			latestBtcaVersion: latestBtca,
+			latestOpencodeVersion: latestOpencode,
 			lastVersionCheck: Date.now()
 		});
 	} catch (error) {

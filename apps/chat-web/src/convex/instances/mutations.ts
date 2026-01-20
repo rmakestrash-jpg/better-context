@@ -135,14 +135,16 @@ export const setVersions = mutation({
 		instanceId: v.id('instances'),
 		btcaVersion: v.optional(v.string()),
 		opencodeVersion: v.optional(v.string()),
-		updateAvailable: v.optional(v.boolean()),
+		latestBtcaVersion: v.optional(v.string()),
+		latestOpencodeVersion: v.optional(v.string()),
 		lastVersionCheck: v.optional(v.number())
 	},
 	handler: async (ctx, args) => {
 		const patch: {
 			btcaVersion?: string;
 			opencodeVersion?: string;
-			updateAvailable?: boolean;
+			latestBtcaVersion?: string;
+			latestOpencodeVersion?: string;
 			lastVersionCheck: number;
 		} = {
 			lastVersionCheck: args.lastVersionCheck ?? Date.now()
@@ -156,8 +158,12 @@ export const setVersions = mutation({
 			patch.opencodeVersion = args.opencodeVersion;
 		}
 
-		if (args.updateAvailable !== undefined) {
-			patch.updateAvailable = args.updateAvailable;
+		if (args.latestBtcaVersion !== undefined) {
+			patch.latestBtcaVersion = args.latestBtcaVersion;
+		}
+
+		if (args.latestOpencodeVersion !== undefined) {
+			patch.latestOpencodeVersion = args.latestOpencodeVersion;
 		}
 
 		await ctx.db.patch(args.instanceId, patch);

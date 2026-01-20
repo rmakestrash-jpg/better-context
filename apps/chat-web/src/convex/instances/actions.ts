@@ -324,16 +324,17 @@ export const checkVersions = action({
 			fetchLatestVersion(OPENCODE_PACKAGE_NAME)
 		]);
 
+		await ctx.runMutation(instanceMutations.setVersions, {
+			instanceId: args.instanceId,
+			latestBtcaVersion: latestBtca,
+			latestOpencodeVersion: latestOpencode,
+			lastVersionCheck: Date.now()
+		});
+
 		const updateAvailable = Boolean(
 			(latestBtca && instance.btcaVersion && latestBtca !== instance.btcaVersion) ||
 			(latestOpencode && instance.opencodeVersion && latestOpencode !== instance.opencodeVersion)
 		);
-
-		await ctx.runMutation(instanceMutations.setVersions, {
-			instanceId: args.instanceId,
-			updateAvailable,
-			lastVersionCheck: Date.now()
-		});
 
 		return {
 			latestBtca,
@@ -505,7 +506,8 @@ async function updateInstanceInternal(
 			instanceId,
 			btcaVersion: versions.btcaVersion,
 			opencodeVersion: versions.opencodeVersion,
-			updateAvailable: false,
+			latestBtcaVersion: versions.btcaVersion,
+			latestOpencodeVersion: versions.opencodeVersion,
 			lastVersionCheck: Date.now()
 		});
 		await ctx.runMutation(instanceMutations.touchActivity, { instanceId });
