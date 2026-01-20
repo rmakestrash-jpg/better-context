@@ -41,9 +41,27 @@
 		isStreaming: boolean;
 		streamStatus: string | null;
 		currentChunks: BtcaChunk[];
+		activeStream: { sessionId: string; messageId: string; startedAt: number } | null;
+		hasBackgroundStream: boolean;
 	}
 
-	let { messages, isStreaming, streamStatus, currentChunks }: Props = $props();
+	let {
+		messages,
+		isStreaming,
+		streamStatus,
+		currentChunks,
+		activeStream,
+		hasBackgroundStream
+	}: Props = $props();
+
+	function formatRelativeTime(timestamp: number): string {
+		const seconds = Math.floor((Date.now() - timestamp) / 1000);
+		if (seconds < 60) return 'just now';
+		const minutes = Math.floor(seconds / 60);
+		if (minutes < 60) return `${minutes}m ago`;
+		const hours = Math.floor(minutes / 60);
+		return `${hours}h ago`;
+	}
 
 	const streamStatusMeta: Record<
 		string,
@@ -336,6 +354,24 @@
 					</div>
 				{/if}
 			{/each}
+
+			<!-- Background stream in progress indicator -->
+			{#if hasBackgroundStream && activeStream}
+				<div class="chat-message chat-message-system">
+					<div class="flex items-center gap-3">
+						<div class="sandbox-status-indicator">
+							<Loader2 size={16} class="animate-spin text-[hsl(var(--bc-accent))]" />
+						</div>
+						<div>
+							<div class="text-sm font-medium">Response in progress</div>
+							<div class="bc-muted text-xs">
+								Started {formatRelativeTime(activeStream.startedAt)}. The response will appear
+								automatically when complete.
+							</div>
+						</div>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Streaming status -->
 			{#if isStreaming && streamStatusInfo}

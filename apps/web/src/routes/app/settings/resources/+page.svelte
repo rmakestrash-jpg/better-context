@@ -36,7 +36,6 @@
 
 	const userResourceNames = $derived(new Set((userResourcesQuery?.data ?? []).map((r) => r.name)));
 
-
 	/**
 	 * Parse a git URL and extract repo info
 	 * Supports: GitHub, GitLab, Bitbucket URLs
@@ -549,7 +548,9 @@
 			<p class="bc-muted mb-4 text-sm">Click a resource to add it to your instance.</p>
 
 			{#if globalAddError}
-				<div class="mb-4 rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-500">
+				<div
+					class="mb-4 rounded border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-500"
+				>
 					{globalAddError}
 				</div>
 			{/if}

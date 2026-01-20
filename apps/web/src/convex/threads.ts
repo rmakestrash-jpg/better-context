@@ -12,7 +12,19 @@ export const list = query({
 			.withIndex('by_instance', (q) => q.eq('instanceId', args.instanceId))
 			.collect();
 
-		return threads.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+		const activeStreamSessions = await ctx.db
+			.query('streamSessions')
+			.filter((q) => q.eq(q.field('status'), 'streaming'))
+			.collect();
+
+		const streamingThreadIds = new Set(activeStreamSessions.map((s) => s.threadId.toString()));
+
+		const threadsWithStreaming = threads.map((thread) => ({
+			...thread,
+			isStreaming: streamingThreadIds.has(thread._id.toString())
+		}));
+
+		return threadsWithStreaming.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 	}
 });
 
@@ -32,11 +44,24 @@ export const getWithMessages = query({
 			.withIndex('by_thread', (q) => q.eq('threadId', args.threadId))
 			.collect();
 
+		const activeStreamSession = await ctx.db
+			.query('streamSessions')
+			.withIndex('by_thread', (q) => q.eq('threadId', args.threadId))
+			.filter((q) => q.eq(q.field('status'), 'streaming'))
+			.first();
+
 		return {
 			...thread,
 			messages: messages.sort((a, b) => a.createdAt - b.createdAt),
 			resources: threadResources.map((r) => r.resourceName),
-			threadResources: threadResources.map((r) => r.resourceName)
+			threadResources: threadResources.map((r) => r.resourceName),
+			activeStream: activeStreamSession
+				? {
+						sessionId: activeStreamSession.sessionId,
+						messageId: activeStreamSession.messageId,
+						startedAt: activeStreamSession.startedAt
+					}
+				: null
 		};
 	}
 });

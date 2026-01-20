@@ -142,8 +142,8 @@
 			}`}
 		>
 			<Sidebar
-				threads={threads}
-				currentThreadId={currentThreadId}
+				{threads}
+				{currentThreadId}
 				isOpen={sidebarOpen}
 				isLoading={threadsLoading}
 				on:close={() => (sidebarOpen = false)}

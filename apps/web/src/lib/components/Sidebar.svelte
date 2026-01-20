@@ -30,6 +30,7 @@
 		_id: string;
 		title?: string | null;
 		lastActivityAt: number;
+		isStreaming?: boolean;
 	};
 
 	interface Props {
@@ -180,8 +181,11 @@
 					onclick={handleNavigate}
 				>
 					<div class="min-w-0 flex-1">
-						<div class="truncate text-sm font-semibold">
+						<div class="flex items-center gap-2 truncate text-sm font-semibold">
 							{thread.title ?? `Thread ${thread._id.slice(0, 8)}...`}
+							{#if thread.isStreaming}
+								<Loader2 size={12} class="shrink-0 animate-spin text-[hsl(var(--bc-accent))]" />
+							{/if}
 						</div>
 						<div class="bc-muted mt-1 text-[11px]">
 							{formatDate(thread.lastActivityAt)}

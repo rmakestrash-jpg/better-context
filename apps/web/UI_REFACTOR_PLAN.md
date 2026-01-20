@@ -52,6 +52,7 @@ Mobile: Hamburger menu that slides out the sidebar.
 **File:** `apps/web/src/lib/components/Sidebar.svelte`
 
 **Structure:**
+
 ```
 - Logo section (top)
 - Action buttons: New Thread, Manage Resources (side by side)
@@ -62,11 +63,13 @@ Mobile: Hamburger menu that slides out the sidebar.
 ```
 
 **Props:**
+
 - `threads`: Thread list data
 - `currentThreadId`: Currently active thread (for highlighting)
 - `isOpen`: For mobile toggle state
 
 **Events:**
+
 - `close`: For mobile to close sidebar after navigation
 
 ### Task 1.2: Create Compact Instance Status Component ✅
@@ -74,6 +77,7 @@ Mobile: Hamburger menu that slides out the sidebar.
 **File:** `apps/web/src/lib/components/InstanceStatus.svelte`
 
 Simplified version of InstanceCard for sidebar:
+
 - Shows status badge inline (Running/Stopped/Starting/etc.)
 - Click to expand dropdown with full controls
 - Dropdown appears below the button, within sidebar width
@@ -83,6 +87,7 @@ Simplified version of InstanceCard for sidebar:
 **File:** `apps/web/src/routes/app/+layout.svelte`
 
 Changes:
+
 - Remove top header entirely
 - Add Sidebar component on left
 - Main content area uses `flex-1` to fill remaining space
@@ -90,25 +95,33 @@ Changes:
 - Add mobile overlay when sidebar is open
 
 **Layout structure:**
+
 ```svelte
 <div class="flex h-dvh">
-  <!-- Mobile hamburger (visible on small screens) -->
-  <button class="fixed top-4 left-4 z-50 lg:hidden">☰</button>
-  
-  <!-- Sidebar -->
-  <aside class="w-64 shrink-0 ... lg:relative fixed inset-y-0 left-0 z-40 transform transition-transform lg:translate-x-0 {sidebarOpen ? 'translate-x-0' : '-translate-x-full'}">
-    <Sidebar ... />
-  </aside>
-  
-  <!-- Mobile overlay -->
-  {#if sidebarOpen}
-    <div class="fixed inset-0 bg-black/50 z-30 lg:hidden" onclick={() => sidebarOpen = false}></div>
-  {/if}
-  
-  <!-- Main content -->
-  <main class="flex-1 flex flex-col min-h-0 lg:ml-0">
-    {@render children()}
-  </main>
+	<!-- Mobile hamburger (visible on small screens) -->
+	<button class="fixed top-4 left-4 z-50 lg:hidden">☰</button>
+
+	<!-- Sidebar -->
+	<aside
+		class="w-64 shrink-0 ... lg:relative fixed inset-y-0 left-0 z-40 transform transition-transform lg:translate-x-0 {sidebarOpen
+			? 'translate-x-0'
+			: '-translate-x-full'}"
+	>
+		<Sidebar ... />
+	</aside>
+
+	<!-- Mobile overlay -->
+	{#if sidebarOpen}
+		<div
+			class="fixed inset-0 bg-black/50 z-30 lg:hidden"
+			onclick={() => (sidebarOpen = false)}
+		></div>
+	{/if}
+
+	<!-- Main content -->
+	<main class="flex-1 flex flex-col min-h-0 lg:ml-0">
+		{@render children()}
+	</main>
 </div>
 ```
 
@@ -117,6 +130,7 @@ Changes:
 **File:** `apps/web/src/routes/app/+page.svelte`
 
 Changes:
+
 - Remove InstanceCard (now in sidebar)
 - Remove thread list (now in sidebar)
 - This page becomes an empty state / welcome screen when no thread is selected
@@ -127,6 +141,7 @@ Changes:
 **File:** `apps/web/src/routes/layout.css`
 
 Add styles for:
+
 - `.bc-sidebar` - sidebar container
 - `.bc-sidebar-section` - sections within sidebar
 - `.bc-thread-item` - thread list items
@@ -140,6 +155,7 @@ Add styles for:
 ### Task 2.1: Thread List in Sidebar ✅
 
 Move thread list rendering to Sidebar component:
+
 - Each thread shows title (or truncated ID if no title)
 - Shows last activity timestamp
 - Delete button on hover
@@ -149,6 +165,7 @@ Move thread list rendering to Sidebar component:
 ### Task 2.2: Client-Side Thread Search ✅
 
 In Sidebar component:
+
 - Search input filters threads by title
 - Case-insensitive matching
 - Empty state when no matches
@@ -163,6 +180,7 @@ In Sidebar component:
 **File:** `apps/web/src/lib/components/ToolCallSummary.svelte`
 
 **Behavior:**
+
 - Aggregate tool calls by type (grep, read, edit, etc.)
 - Display as compact bar at top of assistant message
 - Show counts: `grep ×3 | read ×5 | edit ×2`
@@ -170,6 +188,7 @@ In Sidebar component:
 - Expandable to show individual tool calls (defer for now)
 
 **Integration in ChatMessages.svelte:**
+
 - Replace individual tool indicators with summary bar
 - Group tool chunks, render summary instead of individual items
 
@@ -178,6 +197,7 @@ In Sidebar component:
 **File:** `apps/web/src/lib/components/ChatMessages.svelte`
 
 Add visual separator between conversation turns:
+
 - After each assistant message (before next user message)
 - Style: subtle horizontal line or extra spacing
 - CSS class: `.bc-message-divider`
@@ -188,11 +208,13 @@ Add visual separator between conversation turns:
 
 Current behavior: May auto-scroll during streaming
 Target behavior:
+
 - When user sends message → scroll to bottom immediately
 - During streaming → do NOT auto-scroll
 - User controls their own scroll position
 
 Implementation:
+
 - Add `scrollToBottom()` call in `sendMessage()` after setting `isStreaming = true`
 - Remove any auto-scroll logic tied to chunk updates
 - Keep "Jump to bottom" button for manual scroll
@@ -204,10 +226,12 @@ Implementation:
 Problem: `prose-invert` is hardcoded, breaks light mode
 
 Fix options:
+
 1. Use `dark:prose-invert` instead of `prose-invert`
 2. Or remove `prose-invert` entirely since CSS already defines theme-aware prose variables
 
 Change:
+
 ```svelte
 <!-- Before -->
 <div class="prose prose-neutral prose-invert max-w-none">
@@ -221,10 +245,12 @@ Change:
 ## Phase 4: Polish (Deferred)
 
 ### Task 4.1: Command Palette (DEFERRED)
+
 - `⌘K` to open
 - Search threads, actions
 
 ### Task 4.2: Keyboard Shortcuts (DEFERRED)
+
 - `⌘N` new thread
 - etc.
 
@@ -233,11 +259,13 @@ Change:
 ## File Change Summary
 
 ### New Files
+
 - `apps/web/src/lib/components/Sidebar.svelte`
 - `apps/web/src/lib/components/InstanceStatus.svelte`
 - `apps/web/src/lib/components/ToolCallSummary.svelte`
 
 ### Modified Files
+
 - `apps/web/src/routes/app/+layout.svelte` - Major refactor to sidebar layout
 - `apps/web/src/routes/app/+page.svelte` - Simplify to empty/welcome state
 - `apps/web/src/lib/components/ChatMessages.svelte` - Tool summary, dividers, prose fix
@@ -245,6 +273,7 @@ Change:
 - `apps/web/src/routes/layout.css` - New sidebar styles
 
 ### Potentially Affected
+
 - `apps/web/src/lib/components/InstanceCard.svelte` - May reuse parts for InstanceStatus
 
 ---

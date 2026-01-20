@@ -33,7 +33,9 @@
 	});
 
 	const resourcesQuery = $derived(
-		auth.instanceId ? useQuery(api.resources.listUserResources, { instanceId: auth.instanceId }) : null
+		auth.instanceId
+			? useQuery(api.resources.listUserResources, { instanceId: auth.instanceId })
+			: null
 	);
 
 	// UI state
@@ -41,8 +43,6 @@
 	let streamStatus = $state<string | null>(null);
 	let cancelState = $state<CancelState>('none');
 	let inputValue = $state('');
-	let currentSessionId = $state<string | null>(null);
-	let hasCheckedForActiveStream = $state(false);
 	let chatMessagesRef = $state<{ scrollToBottom: (behavior?: ScrollBehavior) => void } | null>(
 		null
 	);
@@ -53,6 +53,9 @@
 	// Streaming state
 	let currentChunks = $state<BtcaChunk[]>([]);
 	let abortController: AbortController | null = null;
+
+	// Track which thread we're streaming for (fixes thread-scoping bug)
+	let streamingForThreadId = $state<Id<'threads'> | null>(null);
 
 	// Derived values
 	const thread = $derived(threadQuery?.data);
@@ -67,6 +70,16 @@
 	const canChat = $derived(
 		billingStore.isSubscribed && !billingStore.isOverLimit && hasUsableInstance
 	);
+
+	// Only show local streaming UI if it's for THIS thread
+	const isStreamingThisThread = $derived(isStreaming && streamingForThreadId === threadId);
+
+	// Get active stream from Convex (for background streams)
+	const activeStream = $derived(thread?.activeStream ?? null);
+
+	// Show "in progress" indicator when there's a background stream
+	// (stream running but we're not connected to it)
+	const hasBackgroundStream = $derived(activeStream !== null && !isStreamingThisThread);
 
 	$effect(() => {
 		if (!auth.isSignedIn && auth.isLoaded) {
@@ -84,149 +97,18 @@
 		}
 	});
 
-	// Check for active stream on mount/thread change
-	$effect(() => {
-		if (!threadId || !auth.isSignedIn || isStreaming || hasCheckedForActiveStream) return;
-
-		const checkActiveStream = async () => {
-			try {
-				const token = await auth.clerk?.session?.getToken({ template: 'convex' });
-				if (!token) return;
-
-				const response = await fetch(
-					`${convexHttpBaseUrl}/chat/stream/active?threadId=${threadId}`,
-					{
-						headers: { Authorization: `Bearer ${token}` }
-					}
-				);
-
-				if (!response.ok) return;
-
-				const data = (await response.json()) as {
-					active: boolean;
-					sessionId?: string;
-					messageId?: string;
-					chunkCount?: number;
-				};
-
-				if (data.active && data.sessionId) {
-					resumeStream(data.sessionId, 0);
-				}
-			} catch (error) {
-				console.error('Failed to check for active stream:', error);
-			} finally {
-				hasCheckedForActiveStream = true;
-			}
-		};
-
-		checkActiveStream();
-	});
-
-	// Reset check flag when thread changes
+	// Reset streaming display state when navigating to a different thread
 	$effect(() => {
 		threadId;
-		hasCheckedForActiveStream = false;
-	});
 
-	async function resumeStream(sessionId: string, cursor: number) {
-		isStreaming = true;
-		streamStatus = 'resuming';
-		currentSessionId = sessionId;
-		currentChunks = [];
-		abortController = new AbortController();
-		let shouldRefreshUsage = false;
-
-		try {
-			const token = await auth.clerk?.session?.getToken({ template: 'convex' });
-			if (!token) {
-				throw new Error('Missing auth token');
-			}
-
-			const response = await fetch(`${convexHttpBaseUrl}/chat/stream/resume`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`
-				},
-				body: JSON.stringify({ sessionId, cursor }),
-				signal: abortController.signal
-			});
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(errorText || 'Failed to resume stream');
-			}
-			if (!response.body) throw new Error('No response body');
-
-			streamStatus = null;
-
-			const reader = response.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = '';
-
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split('\n');
-				buffer = lines.pop() ?? '';
-
-				let eventData = '';
-				for (const line of lines) {
-					if (line.startsWith('data: ')) {
-						eventData = line.slice(6);
-					} else if (line === '' && eventData) {
-						try {
-							const event = JSON.parse(eventData) as
-								| { type: 'add'; chunk: BtcaChunk }
-								| { type: 'update'; id: string; chunk: Partial<BtcaChunk> }
-								| { type: 'done' }
-								| { type: 'error'; error: string };
-
-							if (event.type === 'add') {
-								const exists = currentChunks.some((c) => c.id === event.chunk.id);
-								if (!exists) {
-									currentChunks = [...currentChunks, event.chunk];
-								}
-							} else if (event.type === 'update') {
-								const exists = currentChunks.some((c) => c.id === event.id);
-								if (exists) {
-									currentChunks = currentChunks.map((c) => {
-										if (c.id !== event.id) return c;
-										return { ...c, ...event.chunk } as BtcaChunk;
-									});
-								}
-							} else if (event.type === 'error') {
-								throw new Error(event.error);
-							} else if (event.type === 'done') {
-								shouldRefreshUsage = true;
-							}
-						} catch (e) {
-							if (!(e instanceof SyntaxError)) throw e;
-						}
-						eventData = '';
-					}
-				}
-			}
-
-			reader.releaseLock();
-		} catch (error) {
-			if ((error as Error).name !== 'AbortError') {
-				console.error('Resume stream error:', error);
-			}
-		} finally {
-			isStreaming = false;
-			streamStatus = null;
-			cancelState = 'none';
+		// If we're viewing a different thread than what we're streaming for,
+		// clear the local display state (stream continues in background)
+		if (streamingForThreadId !== null && streamingForThreadId !== threadId) {
 			currentChunks = [];
-			currentSessionId = null;
-			abortController = null;
-			if (shouldRefreshUsage) {
-				void billingStore.refetch();
-			}
+			streamStatus = null;
+			pendingUserMessage = null;
 		}
-	}
+	});
 
 	async function clearChat() {
 		if (!threadId) return;
@@ -334,6 +216,9 @@
 				await goto(`/app/chat/${newThreadId}`, { replaceState: true });
 			}
 
+			// Track which thread this stream is for
+			streamingForThreadId = actualThreadId;
+
 			const body = JSON.stringify({
 				threadId: actualThreadId,
 				message: savedInput,
@@ -402,7 +287,7 @@
 							}
 
 							if (event.type === 'session') {
-								currentSessionId = event.sessionId;
+								// Session ID received - no longer needed for resume logic
 							} else if (event.type === 'status') {
 								streamStatus = event.status;
 							} else if (event.type === 'add') {
@@ -450,7 +335,7 @@
 			cancelState = 'none';
 			currentChunks = [];
 			pendingUserMessage = null;
-			currentSessionId = null;
+			streamingForThreadId = null;
 			abortController = null;
 			if (shouldRefreshUsage) {
 				void billingStore.refetch();
@@ -673,9 +558,11 @@
 		<ChatMessages
 			bind:this={chatMessagesRef}
 			messages={displayMessages}
-			{isStreaming}
+			isStreaming={isStreamingThisThread}
 			{streamStatus}
 			{currentChunks}
+			{activeStream}
+			{hasBackgroundStream}
 		/>
 
 		<!-- Input (fixed at bottom) -->

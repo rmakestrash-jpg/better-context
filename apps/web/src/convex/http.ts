@@ -8,7 +8,6 @@ import type { Id } from './_generated/dataModel';
 import { httpAction, type ActionCtx } from './_generated/server.js';
 import { AnalyticsEvents } from './analyticsEvents';
 import { instances } from './apiHelpers';
-import { streamOps } from './redis.js';
 
 const usageActions = api.usage;
 const instanceActions = instances.actions;
@@ -317,12 +316,6 @@ const chatStream = httpAction(async (ctx, request) => {
 					content: ''
 				})) as Id<'messages'>;
 
-				await streamOps.initStream(sessionId, {
-					threadId: resolvedThreadId,
-					messageId: assistantMessageId,
-					startedAt: Date.now()
-				});
-
 				await ctx.runMutation(api.streamSessions.create, {
 					threadId: resolvedThreadId,
 					messageId: assistantMessageId,
@@ -399,7 +392,6 @@ const chatStream = httpAction(async (ctx, request) => {
 								}
 								const update = processStreamEvent(event, chunksById, chunkOrder);
 								if (update) {
-									await streamOps.appendChunk(sessionId, update);
 									sendEvent(update);
 								}
 							}
@@ -500,8 +492,6 @@ const chatStream = httpAction(async (ctx, request) => {
 					instanceId: instance._id
 				});
 
-				await streamOps.publishDone(sessionId);
-				await streamOps.setStatus(sessionId, 'done');
 				await ctx.runMutation(api.streamSessions.complete, { sessionId });
 
 				const streamDurationMs = Date.now() - streamStartedAt;
@@ -545,8 +535,6 @@ const chatStream = httpAction(async (ctx, request) => {
 					}
 				});
 
-				await streamOps.publishError(sessionId, errorMessage);
-				await streamOps.setStatus(sessionId, 'error', errorMessage);
 				await ctx.runMutation(api.streamSessions.fail, { sessionId, error: errorMessage });
 
 				if (assistantMessageId) {
@@ -626,202 +614,6 @@ const clerkWebhook = httpAction(async (ctx, request) => {
 	return withCors(request, response);
 });
 
-const streamResumeRequestSchema = z.object({
-	sessionId: z.string().min(1),
-	cursor: z.number().int().min(0).optional()
-});
-
-const streamResume = httpAction(async (ctx, request) => {
-	let rawBody: unknown;
-	try {
-		rawBody = await request.json();
-	} catch {
-		return corsTextResponse(request, 'Invalid request body', 400);
-	}
-
-	const parseResult = streamResumeRequestSchema.safeParse(rawBody);
-	if (!parseResult.success) {
-		const issues = parseResult.error.issues
-			.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-			.join('; ');
-		return corsTextResponse(request, `Invalid request: ${issues}`, 400);
-	}
-
-	const identity = await ctx.auth.getUserIdentity();
-	if (!identity) {
-		return corsTextResponse(request, 'Unauthorized', 401);
-	}
-
-	const { sessionId, cursor = 0 } = parseResult.data;
-
-	const session = await ctx.runQuery(api.streamSessions.getBySessionId, { sessionId });
-	if (!session) {
-		return corsTextResponse(request, 'Stream session not found', 404);
-	}
-
-	const encoder = new TextEncoder();
-
-	const stream = new ReadableStream({
-		async start(controller) {
-			const sendEvent = (payload: StreamEventPayload) => {
-				controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
-			};
-
-			try {
-				const existingChunks = (await streamOps.getChunks(sessionId, cursor)) as ChunkUpdate[];
-				for (const chunk of existingChunks) {
-					sendEvent(chunk);
-				}
-
-				const status = await streamOps.getStatus(sessionId);
-				if (status !== 'streaming') {
-					if (status === 'error') {
-						const meta = await streamOps.getMeta(sessionId);
-						sendEvent({ type: 'error', error: meta?.error ?? 'Stream failed' });
-					} else {
-						sendEvent({ type: 'done' });
-					}
-					controller.close();
-					return;
-				}
-
-				let lastStreamId = '0';
-				let done = false;
-
-				while (!done) {
-					const result = (await ctx.runAction(api.streamActions.readStreamBlocking, {
-						sessionId,
-						lastId: lastStreamId
-					})) as {
-						entries: Array<{ id: string; data?: unknown; type?: string; error?: string }>;
-						lastId: string;
-					};
-					lastStreamId = result.lastId;
-
-					for (const entry of result.entries) {
-						if (entry.type === 'done') {
-							sendEvent({ type: 'done' });
-							done = true;
-							break;
-						} else if (entry.type === 'error') {
-							sendEvent({ type: 'error', error: entry.error ?? 'Stream failed' });
-							done = true;
-							break;
-						} else if (entry.data) {
-							sendEvent(entry.data as ChunkUpdate);
-						}
-					}
-
-					if (!done && result.entries.length === 0) {
-						const currentStatus = await streamOps.getStatus(sessionId);
-						if (currentStatus !== 'streaming') {
-							if (currentStatus === 'error') {
-								const meta = await streamOps.getMeta(sessionId);
-								sendEvent({ type: 'error', error: meta?.error ?? 'Stream failed' });
-							} else {
-								sendEvent({ type: 'done' });
-							}
-							done = true;
-						}
-					}
-				}
-
-				controller.close();
-			} catch (error) {
-				const message = error instanceof Error ? error.message : 'Unknown error';
-				sendEvent({ type: 'error', error: message });
-				controller.close();
-			}
-		}
-	});
-
-	const response = new Response(stream, {
-		headers: {
-			'Content-Type': 'text/event-stream',
-			'Cache-Control': 'no-cache',
-			Connection: 'keep-alive'
-		}
-	});
-
-	return withCors(request, response);
-});
-
-const streamStatus = httpAction(async (ctx, request) => {
-	const url = new URL(request.url);
-	const sessionId = url.searchParams.get('sessionId');
-
-	if (!sessionId) {
-		return corsTextResponse(request, 'Missing sessionId', 400);
-	}
-
-	const identity = await ctx.auth.getUserIdentity();
-	if (!identity) {
-		return corsTextResponse(request, 'Unauthorized', 401);
-	}
-
-	const session = await ctx.runQuery(api.streamSessions.getBySessionId, { sessionId });
-	if (!session) {
-		return withCors(request, jsonResponse({ exists: false }));
-	}
-
-	const status = await streamOps.getStatus(sessionId);
-	const chunkCount = await streamOps.getChunkCount(sessionId);
-
-	return withCors(
-		request,
-		jsonResponse({
-			exists: true,
-			sessionId: session.sessionId,
-			messageId: session.messageId,
-			status: status ?? session.status,
-			chunkCount,
-			startedAt: session.startedAt,
-			completedAt: session.completedAt,
-			error: session.error
-		})
-	);
-});
-
-const getActiveStream = httpAction(async (ctx, request) => {
-	const url = new URL(request.url);
-	const threadId = url.searchParams.get('threadId');
-
-	if (!threadId) {
-		return corsTextResponse(request, 'Missing threadId', 400);
-	}
-
-	const identity = await ctx.auth.getUserIdentity();
-	if (!identity) {
-		return corsTextResponse(request, 'Unauthorized', 401);
-	}
-
-	const session = await ctx.runQuery(api.streamSessions.getActiveForThread, {
-		threadId: threadId as Id<'threads'>
-	});
-
-	if (!session) {
-		return withCors(request, jsonResponse({ active: false }));
-	}
-
-	const status = await streamOps.getStatus(session.sessionId);
-	if (status !== 'streaming') {
-		return withCors(request, jsonResponse({ active: false }));
-	}
-
-	const chunkCount = await streamOps.getChunkCount(session.sessionId);
-
-	return withCors(
-		request,
-		jsonResponse({
-			active: true,
-			sessionId: session.sessionId,
-			messageId: session.messageId,
-			chunkCount,
-			startedAt: session.startedAt
-		})
-	);
-});
-
 http.route({
 	path: '/chat/stream',
 	method: 'POST',
@@ -830,42 +622,6 @@ http.route({
 
 http.route({
 	path: '/chat/stream',
-	method: 'OPTIONS',
-	handler: corsPreflight
-});
-
-http.route({
-	path: '/chat/stream/resume',
-	method: 'POST',
-	handler: streamResume
-});
-
-http.route({
-	path: '/chat/stream/resume',
-	method: 'OPTIONS',
-	handler: corsPreflight
-});
-
-http.route({
-	path: '/chat/stream/status',
-	method: 'GET',
-	handler: streamStatus
-});
-
-http.route({
-	path: '/chat/stream/status',
-	method: 'OPTIONS',
-	handler: corsPreflight
-});
-
-http.route({
-	path: '/chat/stream/active',
-	method: 'GET',
-	handler: getActiveStream
-});
-
-http.route({
-	path: '/chat/stream/active',
 	method: 'OPTIONS',
 	handler: corsPreflight
 });

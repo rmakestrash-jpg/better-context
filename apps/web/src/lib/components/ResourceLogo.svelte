@@ -7,7 +7,11 @@
 	import TurboSvg from '$lib/svgs/TurboSvg.svelte';
 	import ZodSvg from '$lib/svgs/ZodSvg.svelte';
 
-	let { size = 36, className = '', logoKey } = $props<{
+	let {
+		size = 36,
+		className = '',
+		logoKey
+	} = $props<{
 		size?: number;
 		className?: string;
 		logoKey?: string;
@@ -39,12 +43,7 @@
 	{#if Logo}
 		<Logo />
 	{:else}
-		<svg
-			viewBox="0 0 64 64"
-			fill="none"
-			xmlns="http://www.w3.org/2000/svg"
-			aria-hidden="true"
-		>
+		<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 			<rect x="6" y="6" width="52" height="52" rx="14" fill="currentColor" opacity="0.16" />
 			<rect x="14" y="14" width="36" height="36" rx="10" stroke="currentColor" stroke-width="3" />
 			<path
