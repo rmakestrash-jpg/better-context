@@ -4,7 +4,6 @@
 	import { getAuthState } from '$lib/stores/auth.svelte';
 	import { getBillingStore } from '$lib/stores/billing.svelte';
 	import { SUPPORT_URL } from '$lib/billing/plans';
-	import InstanceCard from '$lib/components/InstanceCard.svelte';
 
 	const auth = getAuthState();
 	const billingStore = getBillingStore();
@@ -42,7 +41,6 @@
 
 <div class="flex flex-1 overflow-hidden">
 	<div class="mx-auto flex w-full max-w-3xl flex-col gap-8 overflow-y-auto p-8">
-		<InstanceCard />
 		<div>
 			<h1 class="text-2xl font-semibold">Usage</h1>
 			<p class="bc-muted mt-1 text-sm">Monthly usage resets automatically.</p>

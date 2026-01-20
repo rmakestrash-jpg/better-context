@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { ArrowDown, Check, CheckCircle2, Copy, Loader2 } from '@lucide/svelte';
-	import type { Message, BtcaChunk, AssistantContent } from '$lib/types';
 	import { nanoid } from 'nanoid';
 	import { marked } from 'marked';
 	import { createHighlighter } from 'shiki';
 	import DOMPurify from 'isomorphic-dompurify';
+	import ToolCallSummary from '$lib/components/ToolCallSummary.svelte';
+	import type { Message, BtcaChunk, AssistantContent } from '$lib/types';
 
 	// Type guards for AssistantContent (can be string | { type: 'text' } | { type: 'chunks' })
 	function isTextContent(content: AssistantContent): content is { type: 'text'; content: string } {
@@ -90,9 +91,9 @@
 		isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
 	}
 
-	function scrollToBottom() {
+	export function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
 		if (!scrollContainer) return;
-		scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+		scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior });
 	}
 
 	// Copy state
@@ -254,12 +255,20 @@
 		}
 		return [...reasoning, ...tools, ...text, ...other];
 	}
+
+	function getToolChunks(chunks: BtcaChunk[]): BtcaChunk[] {
+		return chunks.filter((chunk) => chunk.type === 'tool');
+	}
+
+	function getRenderableChunks(chunks: BtcaChunk[]): BtcaChunk[] {
+		return sortChunks(chunks).filter((chunk) => chunk.type !== 'tool');
+	}
 </script>
 
 <div class="relative min-h-0 flex-1">
 	<div bind:this={scrollContainer} onscroll={handleScroll} class="absolute inset-0 overflow-y-auto">
 		<div class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-5">
-			{#each messages as message (message.id)}
+			{#each messages as message, index (message.id)}
 				{#if message.role === 'user'}
 					<div class="chat-message chat-message-user">
 						<div class="mb-1 flex items-center gap-2">
@@ -276,36 +285,28 @@
 							<span class="text-xs font-medium text-[hsl(var(--bc-success))]">AI</span>
 						</div>
 						{#if typeof message.content === 'string'}
-							<div class="prose prose-neutral prose-invert max-w-none">
+							<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
 								{@html getRenderedMarkdown(message.content)}
 							</div>
 						{:else if isTextContent(message.content)}
-							<div class="prose prose-neutral prose-invert max-w-none">
+							<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
 								{@html getRenderedMarkdown(message.content.content)}
 							</div>
 						{:else if isChunksContent(message.content)}
+							{@const toolChunks = getToolChunks(message.content.chunks)}
+							{@const renderableChunks = getRenderableChunks(message.content.chunks)}
+							{#if toolChunks.length > 0}
+								<ToolCallSummary chunks={toolChunks} />
+							{/if}
 							<div class="space-y-3">
-								{#each sortChunks(message.content.chunks) as chunk (chunk.id)}
+								{#each renderableChunks as chunk (chunk.id)}
 									{#if chunk.type === 'reasoning'}
 										<div class="reasoning-block">
 											<span class="font-medium">Thinking:</span>
 											{chunk.text}
 										</div>
-									{:else if chunk.type === 'tool'}
-										<div class="tool-indicator">
-											{#if chunk.state === 'running'}
-												<Loader2 size={12} class="animate-spin" />
-											{:else}
-												<span
-													class="tool-dot {chunk.state === 'completed'
-														? 'tool-dot-completed'
-														: 'tool-dot-pending'}"
-												></span>
-											{/if}
-											<span>{chunk.toolName}</span>
-										</div>
 									{:else if chunk.type === 'text'}
-										<div class="prose prose-neutral prose-invert max-w-none">
+										<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
 											{@html getRenderedMarkdown(chunk.text)}
 										</div>
 									{/if}
@@ -326,6 +327,9 @@
 							</button>
 						</div>
 					</div>
+					{#if messages[index + 1]?.role === 'user'}
+						<div class="bc-message-divider"></div>
+					{/if}
 				{:else if message.role === 'system'}
 					<div class="chat-message chat-message-system">
 						<div class="text-sm">{message.content}</div>
@@ -359,33 +363,25 @@
 
 			<!-- Streaming -->
 			{#if isStreaming && currentChunks.length > 0}
+				{@const streamingToolChunks = getToolChunks(currentChunks)}
+				{@const streamingRenderableChunks = getRenderableChunks(currentChunks)}
 				<div class="chat-message chat-message-assistant">
 					<div class="mb-2 flex items-center gap-2">
 						<span class="text-xs font-medium text-[hsl(var(--bc-success))]">AI</span>
 						<Loader2 size={12} class="animate-spin" />
 					</div>
+					{#if streamingToolChunks.length > 0}
+						<ToolCallSummary chunks={streamingToolChunks} />
+					{/if}
 					<div class="space-y-3">
-						{#each sortChunks(currentChunks) as chunk (chunk.id)}
+						{#each streamingRenderableChunks as chunk (chunk.id)}
 							{#if chunk.type === 'reasoning'}
 								<div class="reasoning-block">
 									<span class="font-medium">Thinking:</span>
 									{chunk.text}
 								</div>
-							{:else if chunk.type === 'tool'}
-								<div class="tool-indicator">
-									{#if chunk.state === 'running'}
-										<Loader2 size={12} class="animate-spin" />
-									{:else}
-										<span
-											class="tool-dot {chunk.state === 'completed'
-												? 'tool-dot-completed'
-												: 'tool-dot-pending'}"
-										></span>
-									{/if}
-									<span>{chunk.toolName}</span>
-								</div>
 							{:else if chunk.type === 'text'}
-								<div class="prose prose-neutral prose-invert max-w-none">
+								<div class="prose prose-sm prose-neutral dark:prose-invert max-w-none">
 									{@html getRenderedMarkdown(chunk.text)}
 								</div>
 							{/if}
@@ -401,7 +397,7 @@
 	{#if !isAtBottom}
 		<button
 			type="button"
-			onclick={scrollToBottom}
+			onclick={() => scrollToBottom()}
 			class="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 border border-[hsl(var(--bc-border))] bg-[hsl(var(--bc-surface))] px-3 py-1.5 text-xs font-medium shadow-md transition-colors hover:border-[hsl(var(--bc-fg))] hover:bg-[hsl(var(--bc-surface-2))]"
 		>
 			<ArrowDown size={14} />

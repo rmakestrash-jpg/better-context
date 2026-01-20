@@ -47,7 +47,7 @@ Mobile: Hamburger menu that slides out the sidebar.
 
 ## Phase 1: Sidebar Layout Foundation
 
-### Task 1.1: Create Sidebar Component
+### Task 1.1: Create Sidebar Component ✅
 
 **File:** `apps/web/src/lib/components/Sidebar.svelte`
 
@@ -69,7 +69,7 @@ Mobile: Hamburger menu that slides out the sidebar.
 **Events:**
 - `close`: For mobile to close sidebar after navigation
 
-### Task 1.2: Create Compact Instance Status Component
+### Task 1.2: Create Compact Instance Status Component ✅
 
 **File:** `apps/web/src/lib/components/InstanceStatus.svelte`
 
@@ -78,7 +78,7 @@ Simplified version of InstanceCard for sidebar:
 - Click to expand dropdown with full controls
 - Dropdown appears below the button, within sidebar width
 
-### Task 1.3: Refactor App Layout
+### Task 1.3: Refactor App Layout ✅
 
 **File:** `apps/web/src/routes/app/+layout.svelte`
 
@@ -112,7 +112,7 @@ Changes:
 </div>
 ```
 
-### Task 1.4: Update Thread List Page
+### Task 1.4: Update Thread List Page ✅
 
 **File:** `apps/web/src/routes/app/+page.svelte`
 
@@ -122,7 +122,7 @@ Changes:
 - This page becomes an empty state / welcome screen when no thread is selected
 - Or redirect to most recent thread
 
-### Task 1.5: Add Sidebar CSS
+### Task 1.5: Add Sidebar CSS ✅
 
 **File:** `apps/web/src/routes/layout.css`
 
@@ -137,7 +137,7 @@ Add styles for:
 
 ## Phase 2: Thread List & Search
 
-### Task 2.1: Thread List in Sidebar
+### Task 2.1: Thread List in Sidebar ✅
 
 Move thread list rendering to Sidebar component:
 - Each thread shows title (or truncated ID if no title)
@@ -146,7 +146,7 @@ Move thread list rendering to Sidebar component:
 - Active thread highlighted
 - Scrollable container
 
-### Task 2.2: Client-Side Thread Search
+### Task 2.2: Client-Side Thread Search ✅
 
 In Sidebar component:
 - Search input filters threads by title
@@ -158,7 +158,7 @@ In Sidebar component:
 
 ## Phase 3: Chat View Improvements
 
-### Task 3.1: Tool Call Summary Bar
+### Task 3.1: Tool Call Summary Bar ✅
 
 **File:** `apps/web/src/lib/components/ToolCallSummary.svelte`
 
@@ -173,7 +173,7 @@ In Sidebar component:
 - Replace individual tool indicators with summary bar
 - Group tool chunks, render summary instead of individual items
 
-### Task 3.2: Message Dividers
+### Task 3.2: Message Dividers ✅
 
 **File:** `apps/web/src/lib/components/ChatMessages.svelte`
 
@@ -182,7 +182,7 @@ Add visual separator between conversation turns:
 - Style: subtle horizontal line or extra spacing
 - CSS class: `.bc-message-divider`
 
-### Task 3.3: Fix Scroll Behavior
+### Task 3.3: Fix Scroll Behavior ✅
 
 **File:** `apps/web/src/routes/app/chat/[id]/+page.svelte`
 
@@ -197,7 +197,7 @@ Implementation:
 - Remove any auto-scroll logic tied to chunk updates
 - Keep "Jump to bottom" button for manual scroll
 
-### Task 3.4: Fix Light Mode Prose Colors
+### Task 3.4: Fix Light Mode Prose Colors ✅
 
 **File:** `apps/web/src/lib/components/ChatMessages.svelte`
 

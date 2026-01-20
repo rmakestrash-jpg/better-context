@@ -26,7 +26,6 @@
 	const features = [
 		'Claude Haiku 4.5 model tuned for docs QA',
 		'Dedicated Daytona sandbox per session',
-		'MCP access with API keys',
 		'Monthly usage budget across tokens + sandbox time',
 		'Priority support via X'
 	];

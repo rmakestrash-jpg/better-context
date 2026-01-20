@@ -1,18 +1,18 @@
 <script lang="ts">
 	import { MessageSquare, Loader2, Send } from '@lucide/svelte';
-	import type { BtcaChunk, CancelState } from '$lib/types';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
-	import ChatMessages from '$lib/components/ChatMessages.svelte';
 	import { useQuery, useConvexClient } from 'convex-svelte';
-	import { api } from '../../../../convex/_generated/api';
+	import ChatMessages from '$lib/components/ChatMessages.svelte';
 	import { getAuthState } from '$lib/stores/auth.svelte';
-	import type { Id } from '../../../../convex/_generated/dataModel';
 	import { getBillingStore } from '$lib/stores/billing.svelte';
 	import { getInstanceStore } from '$lib/stores/instance.svelte';
 	import { trackEvent, ClientAnalyticsEvents } from '$lib/stores/analytics.svelte';
 	import { SUPPORT_URL } from '$lib/billing/plans';
+	import type { BtcaChunk, CancelState } from '$lib/types';
+	import { api } from '../../../../convex/_generated/api';
+	import type { Id } from '../../../../convex/_generated/dataModel';
 
 	// Get thread ID from route params - can be 'new' for a fresh thread
 	const routeId = $derived((page.params as { id: string }).id);
@@ -43,6 +43,9 @@
 	let inputValue = $state('');
 	let currentSessionId = $state<string | null>(null);
 	let hasCheckedForActiveStream = $state(false);
+	let chatMessagesRef = $state<{ scrollToBottom: (behavior?: ScrollBehavior) => void } | null>(
+		null
+	);
 
 	// Pending message shown immediately while waiting for stream
 	let pendingUserMessage = $state<{ content: string; resources: string[] } | null>(null);
@@ -74,10 +77,13 @@
 		}
 	});
 
-	// Auto-focus input on page load
+	// Auto-focus input on page load and route changes
 	$effect(() => {
+		// Track routeId to re-run when navigating between threads
+		routeId;
 		if (inputEl && auth.isSignedIn) {
-			inputEl.focus();
+			// Use tick to ensure DOM is ready after navigation
+			queueMicrotask(() => inputEl?.focus());
 		}
 	});
 
@@ -309,6 +315,7 @@
 		const savedInput = inputValue;
 		inputValue = '';
 		isStreaming = true;
+		chatMessagesRef?.scrollToBottom('auto');
 		// Show the user message immediately
 		pendingUserMessage = { content: savedInput, resources: validResources };
 		// Stream status will be sent from server via SSE events
@@ -666,7 +673,13 @@
 		</div>
 	{:else}
 		<!-- Messages (scrollable area) -->
-		<ChatMessages messages={displayMessages} {isStreaming} {streamStatus} {currentChunks} />
+		<ChatMessages
+			bind:this={chatMessagesRef}
+			messages={displayMessages}
+			{isStreaming}
+			{streamStatus}
+			{currentChunks}
+		/>
 
 		<!-- Input (fixed at bottom) -->
 		<div class="chat-input-container shrink-0">

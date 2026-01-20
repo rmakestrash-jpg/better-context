@@ -4,7 +4,6 @@
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { api } from '../../../../convex/_generated/api';
 	import { getAuthState } from '$lib/stores/auth.svelte';
-	import InstanceCard from '$lib/components/InstanceCard.svelte';
 
 	const auth = getAuthState();
 	const client = useConvexClient();
@@ -198,7 +197,6 @@
 
 <div class="flex flex-1 overflow-hidden">
 	<div class="mx-auto flex w-full max-w-3xl flex-col gap-8 overflow-y-auto p-8">
-		<InstanceCard />
 		<!-- Header -->
 		<div>
 			<h1 class="text-2xl font-semibold">Resources</h1>

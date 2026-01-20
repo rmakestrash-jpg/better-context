@@ -8,7 +8,6 @@
 		remoteCreateCheckoutSession
 	} from '$lib/remote/billing.remote';
 	import { BILLING_PLAN } from '$lib/billing/plans';
-	import InstanceCard from '$lib/components/InstanceCard.svelte';
 	import PricingPlans from '$lib/components/pricing/PricingPlans.svelte';
 
 	const auth = getAuthState();
@@ -64,7 +63,6 @@
 
 <div class="flex flex-1 overflow-hidden">
 	<div class="mx-auto flex w-full max-w-3xl flex-col gap-8 overflow-y-auto p-8">
-		<InstanceCard />
 		<div>
 			<h1 class="text-2xl font-semibold">Billing</h1>
 			<p class="bc-muted mt-1 text-sm">Manage your subscription and payment details.</p>
