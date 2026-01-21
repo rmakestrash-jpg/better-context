@@ -72,9 +72,7 @@
 			<span>CLI</span>
 		</div>
 
-		<h1 class="bc-h1 text-balance text-5xl sm:text-6xl">
-			Ship answers from the real source.
-		</h1>
+		<h1 class="bc-h1 text-balance text-5xl sm:text-6xl">Ship answers from the real source.</h1>
 		<p class="bc-prose max-w-2xl text-pretty text-base sm:text-lg">
 			The CLI clones repos locally, searches code, and returns citations. It is fast, private, and
 			terminal-first.
@@ -95,7 +93,8 @@
 								rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 							})}
 						{:else}
-							<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{INSTALL_CMD}</code></pre>
+							<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{INSTALL_CMD}</code
+								></pre>
 						{/if}
 					</div>
 					<CopyButton text={INSTALL_CMD} label="Copy install command" />
@@ -121,7 +120,8 @@
 								rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 							})}
 						{:else}
-							<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{RESOURCE_ADD_CMD}</code></pre>
+							<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{RESOURCE_ADD_CMD}</code
+								></pre>
 						{/if}
 					</div>
 					<CopyButton text={RESOURCE_ADD_CMD} label="Copy resource command" />
@@ -142,7 +142,8 @@
 								rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 							})}
 						{:else}
-							<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{QUICK_START_CMD}</code></pre>
+							<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{QUICK_START_CMD}</code
+								></pre>
 						{/if}
 					</div>
 					<CopyButton text={QUICK_START_CMD} label="Copy quick start command" />
@@ -200,7 +201,8 @@
 										rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 									})}
 								{:else}
-									<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{cmd.example}</code></pre>
+									<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{cmd.example}</code
+										></pre>
 								{/if}
 							</div>
 							<CopyButton text={cmd.example} label="Copy command" />
@@ -217,8 +219,8 @@
 			<span>Configuration</span>
 		</div>
 		<p class="mt-2 max-w-2xl text-sm bc-prose">
-			Add resources and model details in <code class="bc-inlineCode">btca.config.jsonc</code>. You can
-			place this in your project to define exactly what btca should search.
+			Add resources and model details in <code class="bc-inlineCode">btca.config.jsonc</code>. You
+			can place this in your project to define exactly what btca should search.
 		</p>
 
 		<div class="mt-4 bc-card bc-ring p-5">
@@ -235,7 +237,8 @@
 							rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 						})}
 					{:else}
-						<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{configExample}</code></pre>
+						<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{configExample}</code
+							></pre>
 					{/if}
 				</div>
 			</div>

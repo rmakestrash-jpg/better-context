@@ -87,8 +87,7 @@ Available resources: svelte, effect`;
 
 		<p class="mt-4 text-sm bc-prose">
 			On first run, btca creates a default global config with some starter resources. Use
-			<code class="bc-inlineCode">dataDirectory</code> to control where btca stores resources and
-			collections.
+			<code class="bc-inlineCode">dataDirectory</code> to control where btca stores resources and collections.
 		</p>
 	</section>
 
@@ -151,7 +150,7 @@ Available resources: svelte, effect`;
 						href={model.providerSetupUrl}
 						target="_blank"
 						rel="noreferrer"
-					class="mt-3 inline-block text-sm text-[hsl(var(--bc-accent))]"
+						class="mt-3 inline-block text-sm text-[hsl(var(--bc-accent))]"
 					>
 						Provider setup instructions
 					</a>
@@ -210,7 +209,8 @@ Available resources: svelte, effect`;
 							<td class="py-2 pr-4"><code class="bc-inlineCode">type</code></td>
 							<td class="py-2 pr-4">Yes</td>
 							<td class="py-2">
-								<code class="bc-inlineCode">"git"</code> or <code class="bc-inlineCode">"local"</code>
+								<code class="bc-inlineCode">"git"</code> or
+								<code class="bc-inlineCode">"local"</code>
 							</td>
 						</tr>
 						<tr class="border-b border-[hsl(var(--bc-border))]">

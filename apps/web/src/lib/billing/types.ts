@@ -8,6 +8,7 @@ export type BillingSummary = {
 	plan: 'pro' | 'free' | 'none';
 	status: 'active' | 'trialing' | 'canceled' | 'none';
 	currentPeriodEnd?: number;
+	canceledAt?: number;
 	customer?: {
 		name?: string | null;
 		email?: string | null;

@@ -43,6 +43,7 @@ type BillingSummaryResult = {
 	plan: 'pro' | 'free' | 'none';
 	status: 'active' | 'trialing' | 'canceled' | 'none';
 	currentPeriodEnd: number | undefined;
+	canceledAt: number | undefined;
 	customer: { name: null; email: null };
 	paymentMethod: unknown;
 	usage: {
@@ -119,7 +120,12 @@ async function getOrCreateCustomer(user: {
 	name?: string | null;
 }): Promise<{
 	id: string;
-	products?: { id?: string; status?: string; current_period_end?: number | null }[];
+	products?: {
+		id?: string;
+		status?: string;
+		current_period_end?: number | null;
+		canceled_at?: number | null;
+	}[];
 	payment_method?: unknown;
 }> {
 	const autumn = getAutumnClient();
@@ -159,25 +165,47 @@ async function getOrCreateCustomer(user: {
 }
 
 function getActiveProduct(
-	products: { id?: string; status?: string; current_period_end?: number | null }[] | undefined
-): { id: string; status?: string; current_period_end?: number | null } | null {
+	products:
+		| {
+				id?: string;
+				status?: string;
+				current_period_end?: number | null;
+				canceled_at?: number | null;
+		  }[]
+		| undefined
+): {
+	id: string;
+	status?: string;
+	current_period_end?: number | null;
+	canceled_at?: number | null;
+} | null {
 	if (!products?.length) return null;
-	
+
 	const proProduct = products.find(
 		(product) =>
 			product.id === 'btca_pro' && (product.status === 'active' || product.status === 'trialing')
 	);
 	if (proProduct) {
-		return { id: proProduct.id ?? 'btca_pro', status: proProduct.status, current_period_end: proProduct.current_period_end };
+		return {
+			id: proProduct.id ?? 'btca_pro',
+			status: proProduct.status,
+			current_period_end: proProduct.current_period_end,
+			canceled_at: proProduct.canceled_at
+		};
 	}
-	
+
 	const freeProduct = products.find(
 		(product) => product.id === 'free_plan' && product.status === 'active'
 	);
 	if (freeProduct) {
-		return { id: freeProduct.id ?? 'free_plan', status: freeProduct.status, current_period_end: freeProduct.current_period_end };
+		return {
+			id: freeProduct.id ?? 'free_plan',
+			status: freeProduct.status,
+			current_period_end: freeProduct.current_period_end,
+			canceled_at: freeProduct.canceled_at
+		};
 	}
-	
+
 	return null;
 }
 
@@ -243,7 +271,11 @@ export const ensureUsageAvailable = action({
 		const autumnCustomer = await getOrCreateCustomer({
 			clerkId: instance.clerkId,
 			email: identity?.email,
-			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
+			name:
+				identity?.name ??
+				(identity?.givenName
+					? `${identity.givenName} ${identity.familyName ?? ''}`.trim()
+					: undefined)
 		});
 		const activeProduct = getActiveProduct(autumnCustomer.products);
 		if (!activeProduct) {
@@ -390,7 +422,11 @@ export const finalizeUsage = action({
 		const autumnCustomer = await getOrCreateCustomer({
 			clerkId: instance.clerkId,
 			email: identity?.email,
-			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
+			name:
+				identity?.name ??
+				(identity?.givenName
+					? `${identity.givenName} ${identity.familyName ?? ''}`.trim()
+					: undefined)
 		});
 
 		const activeProduct = getActiveProduct(autumnCustomer.products);
@@ -409,7 +445,9 @@ export const finalizeUsage = action({
 			);
 		}
 
-		const outputTokens = isProPlan ? estimateTokensFromChars(args.outputChars + args.reasoningChars) : 0;
+		const outputTokens = isProPlan
+			? estimateTokensFromChars(args.outputChars + args.reasoningChars)
+			: 0;
 		const sandboxUsageHours = isProPlan ? (args.sandboxUsageHours ?? 0) : 0;
 
 		if (isProPlan) {
@@ -464,12 +502,16 @@ export const getBillingSummary = action({
 		const autumnCustomer = await getOrCreateCustomer({
 			clerkId: instance.clerkId,
 			email: identity?.email,
-			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
+			name:
+				identity?.name ??
+				(identity?.givenName
+					? `${identity.givenName} ${identity.familyName ?? ''}`.trim()
+					: undefined)
 		});
 		const activeProduct = getActiveProduct(autumnCustomer.products);
 		const isFreePlan = activeProduct?.id === 'free_plan';
 		const isProPlan = activeProduct?.id === 'btca_pro';
-		
+
 		const plan = isProPlan ? 'pro' : isFreePlan ? 'free' : 'none';
 		const status = activeProduct?.status
 			? (activeProduct.status as 'active' | 'trialing' | 'canceled')
@@ -508,6 +550,7 @@ export const getBillingSummary = action({
 			plan,
 			status,
 			currentPeriodEnd: activeProduct?.current_period_end ?? undefined,
+			canceledAt: activeProduct?.canceled_at ?? undefined,
 			customer: {
 				name: null,
 				email: null
@@ -556,16 +599,20 @@ export const createCheckoutSession = action({
 		const autumnCustomer = await getOrCreateCustomer({
 			clerkId: instance.clerkId,
 			email: identity?.email,
-			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
+			name:
+				identity?.name ??
+				(identity?.givenName
+					? `${identity.givenName} ${identity.familyName ?? ''}`.trim()
+					: undefined)
 		});
 
 		const autumn = getAutumnClient();
 		const payload = await autumn.checkout({
 			customer_id: autumnCustomer.id ?? instance.clerkId,
 			product_id: 'btca_pro',
-			success_url: `${args.baseUrl}/checkout/success`,
+			success_url: `${args.baseUrl}/app/checkout/success`,
 			checkout_session_params: {
-				cancel_url: `${args.baseUrl}/checkout/cancel`
+				cancel_url: `${args.baseUrl}/app/checkout/cancel`
 			}
 		});
 		if (payload.error) {
@@ -587,7 +634,7 @@ export const createCheckoutSession = action({
 		const attachPayload = await autumn.attach({
 			customer_id: autumnCustomer.id ?? instance.clerkId,
 			product_id: 'btca_pro',
-			success_url: `${args.baseUrl}/checkout/success`
+			success_url: `${args.baseUrl}/app/checkout/success`
 		});
 		if (attachPayload.error) {
 			throw new Error(attachPayload.error.message ?? 'Failed to attach checkout session');
@@ -622,11 +669,15 @@ export const createBillingPortalSession = action({
 		const autumnCustomer = await getOrCreateCustomer({
 			clerkId: instance.clerkId,
 			email: identity?.email,
-			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
+			name:
+				identity?.name ??
+				(identity?.givenName
+					? `${identity.givenName} ${identity.familyName ?? ''}`.trim()
+					: undefined)
 		});
 		const autumn = getAutumnClient();
 		const payload = await autumn.customers.billingPortal(autumnCustomer.id ?? instance.clerkId, {
-			return_url: `${args.baseUrl}/settings/billing`
+			return_url: `${args.baseUrl}/app/settings/billing`
 		});
 		if (payload.error) {
 			throw new Error(payload.error.message ?? 'Failed to create billing portal session');

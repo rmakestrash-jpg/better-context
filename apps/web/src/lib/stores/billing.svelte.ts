@@ -30,6 +30,14 @@ class BillingStore {
 		);
 	}
 
+	get isCanceling() {
+		return this.isSubscribed && !!this._summary?.canceledAt;
+	}
+
+	get canceledAt() {
+		return this._summary?.canceledAt ?? null;
+	}
+
 	get isOnFreePlan() {
 		return this._summary?.plan === 'free';
 	}

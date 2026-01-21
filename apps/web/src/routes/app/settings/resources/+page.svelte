@@ -311,12 +311,7 @@
 
 						<div>
 							<label for="confirm-url" class="mb-1 block text-sm font-medium">Git URL *</label>
-							<input
-								id="confirm-url"
-								type="url"
-								class="bc-input w-full"
-								bind:value={formUrl}
-							/>
+							<input id="confirm-url" type="url" class="bc-input w-full" bind:value={formUrl} />
 						</div>
 
 						<div class="grid grid-cols-2 gap-4">

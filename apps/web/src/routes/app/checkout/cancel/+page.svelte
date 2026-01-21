@@ -12,7 +12,7 @@
 			No worries - your card wasn't charged. You can restart checkout whenever you're ready.
 		</p>
 		<div class="flex gap-2">
-			<a href="/pricing" class="bc-btn bc-btn-primary text-sm">Back to pricing</a>
+			<a href="/app/settings/billing" class="bc-btn bc-btn-primary text-sm">Back to pricing</a>
 			<a href="/" class="bc-btn text-sm">Go home</a>
 		</div>
 	</div>

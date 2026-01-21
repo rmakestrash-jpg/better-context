@@ -26,6 +26,16 @@
 		});
 	});
 
+	const formattedCancelDate = $derived.by(() => {
+		const canceledAt = billingStore.canceledAt;
+		if (!canceledAt) return null;
+		return new Date(canceledAt).toLocaleDateString(undefined, {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric'
+		});
+	});
+
 	$effect(() => {
 		if (!auth.isSignedIn && auth.isLoaded) {
 			goto('/app');
@@ -86,7 +96,11 @@
 					<p class="bc-muted text-xs uppercase tracking-[0.2em]">Plan</p>
 					<h2 class="mt-3 text-2xl font-semibold">{BILLING_PLAN.name}</h2>
 					<p class="bc-muted text-sm">${BILLING_PLAN.priceUsd} per month</p>
-					{#if formattedEndDate}
+					{#if billingStore.isCanceling && formattedEndDate}
+						<p class="mt-3 text-xs text-amber-500">
+							Cancels on {formattedEndDate}
+						</p>
+					{:else if formattedEndDate}
 						<p class="bc-muted mt-3 text-xs">Renews on {formattedEndDate}</p>
 					{/if}
 				</div>
