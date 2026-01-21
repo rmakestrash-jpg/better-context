@@ -251,10 +251,6 @@
 							<User size={14} />
 							Profile
 						</button>
-						<a href="/" class="bc-sidebar-menu-item" onclick={handleNavigate}>
-							<Home size={14} />
-							Home
-						</a>
 						{#if billingStore.isSubscribed}
 							<a href="/app/settings/usage" class="bc-sidebar-menu-item" onclick={handleNavigate}>
 								<Settings size={14} />
@@ -273,6 +269,10 @@
 						<a href="/app/settings/resources" class="bc-sidebar-menu-item" onclick={handleNavigate}>
 							<BookOpen size={14} />
 							Resources
+						</a>
+						<a href="/" class="bc-sidebar-menu-item" onclick={handleNavigate}>
+							<Home size={14} />
+							Home
 						</a>
 						<button type="button" class="bc-sidebar-menu-item" onclick={toggleTheme}>
 							{#if themeStore.theme === 'dark'}
