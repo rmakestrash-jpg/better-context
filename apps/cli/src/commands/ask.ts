@@ -19,23 +19,33 @@ function formatError(error: unknown): string {
 }
 
 /**
- * Parse @mentions from query string
+ * Extract potential @mentions from query string (without modifying the query yet)
  */
-function parseQuery(query: string): { query: string; resources: string[] } {
+function extractMentions(query: string): string[] {
 	const mentionRegex = /@([A-Za-z0-9@._/-]+)/g;
-	const resources: string[] = [];
+	const mentions: string[] = [];
 	let match;
 
 	while ((match = mentionRegex.exec(query)) !== null) {
 		if (match[1]) {
-			resources.push(match[1]);
+			mentions.push(match[1]);
 		}
 	}
 
-	// Remove @mentions from query
-	const cleanQuery = query.replace(mentionRegex, '').trim();
+	return mentions;
+}
 
-	return { query: cleanQuery, resources };
+/**
+ * Remove only the valid resource @mentions from the query, leaving others intact
+ */
+function cleanQueryOfValidResources(query: string, validResources: string[]): string {
+	const validSet = new Set(validResources.map((r) => r.toLowerCase()));
+	return query
+		.replace(/@([A-Za-z0-9@._/-]+)/g, (match, mention) => {
+			return validSet.has(mention.toLowerCase()) ? '' : match;
+		})
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 /**
@@ -105,15 +115,6 @@ export const askCommand = new Command('ask')
 
 			const client = createClient(server.url);
 
-			// Parse @mentions from question
-			const parsed = parseQuery(options.question as string);
-
-			// Merge CLI -r flags with @mentions
-			const resourceNames = mergeResources(
-				(options.resource as string[] | undefined) ?? [],
-				parsed.resources
-			);
-
 			const { resources } = await getResources(client);
 			if (resources.length === 0) {
 				console.error('Error: No resources configured.');
@@ -121,26 +122,24 @@ export const askCommand = new Command('ask')
 				process.exit(1);
 			}
 
-			if (resourceNames.length === 0) {
-				// Use all resources if none specified
-				resourceNames.push(...resources.map((r) => r.name));
-			} else {
-				const normalized = normalizeResourceNames(resourceNames, resources);
-				if (normalized.invalid.length > 0) {
-					console.error(
-						`Error: Unknown resource(s): ${normalized.invalid.join(', ')}. ` +
-						'Configure resources in your btca config.'
-					);
-					process.exit(1);
-				}
-				resourceNames.splice(0, resourceNames.length, ...normalized.names);
-			}
+			const questionText = options.question as string;
+			const cliResources = (options.resource as string[] | undefined) ?? [];
+			const mentionedResources = extractMentions(questionText);
+
+			const allRequestedResources = mergeResources(cliResources, mentionedResources);
+
+			const normalized = normalizeResourceNames(allRequestedResources, resources);
+
+			const resourceNames: string[] =
+				normalized.names.length > 0 ? normalized.names : resources.map((r) => r.name);
+
+			const cleanedQuery = cleanQueryOfValidResources(questionText, normalized.names);
 
 			console.log('loading resources...');
 
 			// Stream the response
 			const response = await askQuestionStream(server.url, {
-				question: parsed.query,
+				question: cleanedQuery,
 				resources: resourceNames,
 				quiet: true
 			});
