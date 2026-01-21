@@ -256,6 +256,14 @@
 								<Settings size={14} />
 								Usage
 							</a>
+						{:else if billingStore.isOnFreePlan}
+							<a href="/pricing" class="bc-sidebar-menu-item" onclick={handleNavigate}>
+								<Settings size={14} />
+								Pricing
+							</a>
+							<div class="bc-sidebar-menu-item bc-muted text-xs">
+								{billingStore.freeMessagesRemaining} / {billingStore.freeMessagesTotal} free messages
+							</div>
 						{:else}
 							<a href="/pricing" class="bc-sidebar-menu-item" onclick={handleNavigate}>
 								<Settings size={14} />

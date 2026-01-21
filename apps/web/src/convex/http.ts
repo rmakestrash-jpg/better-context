@@ -267,6 +267,18 @@ const chatStream = httpAction(async (ctx, request) => {
 				402
 			);
 		}
+		if (reason === 'free_limit_reached') {
+			await ctx.scheduler.runAfter(0, internal.analytics.trackEvent, {
+				distinctId: identity.subject,
+				event: AnalyticsEvents.USAGE_LIMIT_REACHED,
+				properties: { instanceId: instance._id, limitType: 'free_messages' }
+			});
+			return corsTextResponse(
+				request,
+				"You've used all 5 free messages. Upgrade to Pro for $8/month to continue.",
+				402
+			);
+		}
 		return corsTextResponse(
 			request,
 			'Usage limits reached. Contact support to raise your limits.',

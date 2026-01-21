@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { MessageSquare, Loader2, Send } from '@lucide/svelte';
+	import { MessageSquare, Loader2, Send, BookOpen } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
@@ -68,7 +68,9 @@
 		return ['running', 'starting', 'stopped', 'updating'].includes(instanceStore.state ?? '');
 	});
 	const canChat = $derived(
-		billingStore.isSubscribed && !billingStore.isOverLimit && hasUsableInstance
+		(billingStore.isSubscribed || billingStore.isOnFreePlan) &&
+			!billingStore.isOverLimit &&
+			hasUsableInstance
 	);
 
 	// Only show local streaming UI if it's for THIS thread
@@ -132,12 +134,16 @@
 
 	async function sendMessage() {
 		if (!auth.instanceId || isStreaming || !inputValue.trim()) return;
-		if (!billingStore.isSubscribed) {
+		if (!billingStore.isSubscribed && !billingStore.isOnFreePlan) {
 			alert('Subscription required. Visit /pricing to subscribe.');
 			return;
 		}
 		if (billingStore.isOverLimit) {
-			alert(`Usage limits reached. Contact ${SUPPORT_URL}.`);
+			if (billingStore.isOnFreePlan) {
+				alert("You've used all 5 free messages. Upgrade to Pro for $8/month to continue.");
+			} else {
+				alert(`Usage limits reached. Contact ${SUPPORT_URL}.`);
+			}
 			return;
 		}
 		if (!hasUsableInstance) {
@@ -243,7 +249,14 @@
 			if (!response.ok) {
 				const errorText = await response.text();
 				if (response.status === 402) {
-					alert(errorText || 'Usage limits reached. Contact support to continue.');
+					if (errorText?.includes('free messages')) {
+						alert(
+							errorText ||
+								"You've used all 5 free messages. Upgrade to Pro for $8/month to continue."
+						);
+					} else {
+						alert(errorText || 'Usage limits reached. Contact support to continue.');
+					}
 					shouldRefreshUsage = true;
 					return;
 				}
@@ -483,10 +496,13 @@
 	}
 
 	function getPlaceholder(): string {
-		if (!billingStore.isSubscribed) {
+		if (!billingStore.isSubscribed && !billingStore.isOnFreePlan) {
 			return 'Subscribe to start chatting';
 		}
 		if (billingStore.isOverLimit) {
+			if (billingStore.isOnFreePlan) {
+				return 'No free messages left. Upgrade to Pro to continue.';
+			}
 			return 'Usage limit reached. Contact support to continue.';
 		}
 		if (!hasUsableInstance) {
@@ -585,6 +601,49 @@
 
 		<!-- Input (fixed at bottom) -->
 		<div class="chat-input-container shrink-0">
+			{#if billingStore.isOnFreePlan}
+				<div class="mb-3 bc-card border-[hsl(var(--bc-border))] bg-[hsl(var(--bc-surface-2))] p-3">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							<span class="text-sm font-medium">
+								Free messages: {billingStore.freeMessagesRemaining} / {billingStore.freeMessagesTotal}
+							</span>
+							{#if billingStore.freeMessagesRemaining === 0}
+								<span class="bc-badge bg-[hsl(var(--bc-warning))] text-xs">Limit reached</span>
+							{/if}
+						</div>
+						<a href="/app/settings/billing" class="bc-btn bc-btn-primary text-xs">
+							Upgrade to Pro
+						</a>
+					</div>
+					{#if billingStore.freeMessagesRemaining === 0}
+						<p class="mt-2 text-xs text-[hsl(var(--bc-warning))]">
+							You've used all your free messages. Upgrade to Pro for unlimited messaging at
+							$8/month.
+						</p>
+					{/if}
+				</div>
+			{/if}
+
+			{#if availableResources.length === 0 && !resourcesQuery?.isLoading}
+				<div class="mb-3 bc-card border-[hsl(var(--bc-accent))] bg-[hsl(var(--bc-surface-2))] p-3">
+					<div class="flex items-center gap-3">
+						<div class="bc-logoMark h-8 w-8 shrink-0">
+							<BookOpen size={14} />
+						</div>
+						<div class="flex-1">
+							<p class="text-sm font-medium">No resources enabled</p>
+							<p class="bc-muted text-xs">
+								You need to add resources to search codebases.
+								<a href="/app/settings/resources" class="text-[hsl(var(--bc-accent))] underline">
+									Click here to add some
+								</a>
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
+
 			{#if threadResources.length > 0}
 				<div class="mb-2 flex flex-wrap items-center gap-2">
 					<span class="bc-muted text-xs">Active:</span>
@@ -661,7 +720,7 @@
 				{/if}
 			</div>
 
-			{#if !billingStore.isSubscribed}
+			{#if !billingStore.isSubscribed && !billingStore.isOnFreePlan}
 				<div
 					class="bc-card mt-3 border-[hsl(var(--bc-warning))] bg-[hsl(var(--bc-surface-2))] p-3 text-xs"
 				>
@@ -671,8 +730,12 @@
 				<div
 					class="bc-card mt-3 border-[hsl(var(--bc-error))] bg-[hsl(var(--bc-surface-2))] p-3 text-xs"
 				>
-					You've hit your monthly usage limits. Contact
-					<a href={SUPPORT_URL} target="_blank" rel="noreferrer">{SUPPORT_URL}</a> to raise them.
+					{#if billingStore.isOnFreePlan}
+						You've used all 5 free messages. <a href="/pricing">Upgrade to Pro</a> for $8/month to continue.
+					{:else}
+						You've hit your monthly usage limits. Contact
+						<a href={SUPPORT_URL} target="_blank" rel="noreferrer">{SUPPORT_URL}</a> to raise them.
+					{/if}
 				</div>
 			{/if}
 

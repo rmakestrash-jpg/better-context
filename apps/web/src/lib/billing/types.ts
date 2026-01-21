@@ -5,7 +5,7 @@ export type UsageMetric = {
 };
 
 export type BillingSummary = {
-	plan: 'pro' | 'none';
+	plan: 'pro' | 'free' | 'none';
 	status: 'active' | 'trialing' | 'canceled' | 'none';
 	currentPeriodEnd?: number;
 	customer?: {
@@ -25,5 +25,10 @@ export type BillingSummary = {
 		tokensIn: UsageMetric;
 		tokensOut: UsageMetric;
 		sandboxHours: UsageMetric;
+	};
+	freeMessages?: {
+		used: number;
+		total: number;
+		remaining: number;
 	};
 };

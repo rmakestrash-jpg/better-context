@@ -3,7 +3,7 @@ import { command, getRequestEvent } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { ConvexHttpClient } from 'convex/browser';
 import { z } from 'zod';
-import { env } from '$env/dynamic/private';
+import { env } from '$env/dynamic/public';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
 
@@ -20,7 +20,7 @@ const instanceQueries = (api as NestedApi)['instances/queries'];
 const usageActions = api.usage;
 
 function getConvexClient() {
-	return new ConvexHttpClient(env.CONVEX_URL!);
+	return new ConvexHttpClient(env.PUBLIC_CONVEX_URL!);
 }
 
 async function getInstance(userId: string) {

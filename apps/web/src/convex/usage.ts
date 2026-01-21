@@ -13,7 +13,7 @@ type FeatureMetrics = {
 };
 
 type UsageCheckResult =
-	| { ok: false; reason: 'subscription_required' }
+	| { ok: false; reason: 'subscription_required' | 'free_limit_reached' }
 	| {
 			ok: boolean;
 			reason: string | null;
@@ -40,7 +40,7 @@ type UsageMetricDisplay = {
 };
 
 type BillingSummaryResult = {
-	plan: 'pro' | 'none';
+	plan: 'pro' | 'free' | 'none';
 	status: 'active' | 'trialing' | 'canceled' | 'none';
 	currentPeriodEnd: number | undefined;
 	customer: { name: null; email: null };
@@ -49,6 +49,11 @@ type BillingSummaryResult = {
 		tokensIn: UsageMetricDisplay;
 		tokensOut: UsageMetricDisplay;
 		sandboxHours: UsageMetricDisplay;
+	};
+	freeMessages?: {
+		used: number;
+		total: number;
+		remaining: number;
 	};
 };
 
@@ -59,7 +64,8 @@ const CHARS_PER_TOKEN = 4;
 const FEATURE_IDS = {
 	tokensIn: 'tokens_in',
 	tokensOut: 'tokens_out',
-	sandboxHours: 'sandbox_hours'
+	sandboxHours: 'sandbox_hours',
+	chatMessages: 'chat_messages'
 } as const;
 
 const billingArgs = { instanceId: v.id('instances') };
@@ -154,14 +160,25 @@ async function getOrCreateCustomer(user: {
 
 function getActiveProduct(
 	products: { id?: string; status?: string; current_period_end?: number | null }[] | undefined
-) {
+): { id: string; status?: string; current_period_end?: number | null } | null {
 	if (!products?.length) return null;
-	return (
-		products.find(
-			(product) =>
-				product.id === 'btca_pro' && (product.status === 'active' || product.status === 'trialing')
-		) ?? null
+	
+	const proProduct = products.find(
+		(product) =>
+			product.id === 'btca_pro' && (product.status === 'active' || product.status === 'trialing')
 	);
+	if (proProduct) {
+		return { id: proProduct.id ?? 'btca_pro', status: proProduct.status, current_period_end: proProduct.current_period_end };
+	}
+	
+	const freeProduct = products.find(
+		(product) => product.id === 'free_plan' && product.status === 'active'
+	);
+	if (freeProduct) {
+		return { id: freeProduct.id ?? 'free_plan', status: freeProduct.status, current_period_end: freeProduct.current_period_end };
+	}
+	
+	return null;
 }
 
 async function checkFeature(args: {
@@ -222,8 +239,11 @@ export const ensureUsageAvailable = action({
 			throw new Error('Instance not found');
 		}
 
+		const identity = await ctx.auth.getUserIdentity();
 		const autumnCustomer = await getOrCreateCustomer({
-			clerkId: instance.clerkId
+			clerkId: instance.clerkId,
+			email: identity?.email,
+			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
 		});
 		const activeProduct = getActiveProduct(autumnCustomer.products);
 		if (!activeProduct) {
@@ -233,72 +253,120 @@ export const ensureUsageAvailable = action({
 			};
 		}
 
-		const inputTokens = estimateTokensFromText(args.question);
-		const now = Date.now();
-		const sandboxUsageHours = args.resources.length
-			? estimateSandboxUsageHours({ lastActiveAt: instance.lastActiveAt, now })
-			: 0;
+		const isFreePlan = activeProduct.id === 'free_plan';
+		const isProPlan = activeProduct.id === 'btca_pro';
 
-		const requiredTokensIn = inputTokens > 0 ? inputTokens : undefined;
-		const requiredTokensOut = 1;
-		const requiredSandboxHours = sandboxUsageHours > 0 ? sandboxUsageHours : undefined;
-
-		const [tokensIn, tokensOut, sandboxHours] = await Promise.all([
-			checkFeature({
+		if (isFreePlan) {
+			const chatMessages = await checkFeature({
 				customerId: autumnCustomer.id ?? instance.clerkId,
-				featureId: FEATURE_IDS.tokensIn,
-				requiredBalance: requiredTokensIn
-			}),
-			checkFeature({
-				customerId: autumnCustomer.id ?? instance.clerkId,
-				featureId: FEATURE_IDS.tokensOut,
-				requiredBalance: requiredTokensOut
-			}),
-			checkFeature({
-				customerId: autumnCustomer.id ?? instance.clerkId,
-				featureId: FEATURE_IDS.sandboxHours,
-				requiredBalance: requiredSandboxHours
-			})
-		]);
-
-		const hasEnough = (balance: number, required?: number) =>
-			required == null ? balance > 0 : balance >= required;
-
-		const ok =
-			hasEnough(tokensIn.balance, requiredTokensIn) &&
-			hasEnough(tokensOut.balance, requiredTokensOut) &&
-			hasEnough(sandboxHours.balance, requiredSandboxHours);
-
-		if (!ok) {
-			const limitTypes: string[] = [];
-			if (!hasEnough(tokensIn.balance, requiredTokensIn)) limitTypes.push('tokensIn');
-			if (!hasEnough(tokensOut.balance, requiredTokensOut)) limitTypes.push('tokensOut');
-			if (!hasEnough(sandboxHours.balance, requiredSandboxHours)) limitTypes.push('sandboxHours');
-
-			await ctx.scheduler.runAfter(0, internal.analytics.trackEvent, {
-				distinctId: instance.clerkId,
-				event: AnalyticsEvents.USAGE_LIMIT_REACHED,
-				properties: {
-					instanceId: args.instanceId,
-					limitTypes,
-					tokensInBalance: tokensIn.balance,
-					tokensOutBalance: tokensOut.balance,
-					sandboxHoursBalance: sandboxHours.balance
-				}
+				featureId: FEATURE_IDS.chatMessages,
+				requiredBalance: 1
 			});
+
+			if (chatMessages.balance <= 0) {
+				await ctx.scheduler.runAfter(0, internal.analytics.trackEvent, {
+					distinctId: instance.clerkId,
+					event: AnalyticsEvents.USAGE_LIMIT_REACHED,
+					properties: {
+						instanceId: args.instanceId,
+						limitTypes: ['chatMessages'],
+						chatMessagesBalance: chatMessages.balance
+					}
+				});
+
+				return {
+					ok: false,
+					reason: 'free_limit_reached'
+				};
+			}
+
+			return {
+				ok: true,
+				reason: null,
+				metrics: {
+					tokensIn: { usage: 0, balance: 0, included: 0 },
+					tokensOut: { usage: 0, balance: 0, included: 0 },
+					sandboxHours: { usage: 0, balance: 0, included: 0 }
+				},
+				inputTokens: 0,
+				sandboxUsageHours: 0,
+				customerId: autumnCustomer.id ?? instance.clerkId
+			};
+		}
+
+		if (isProPlan) {
+			const inputTokens = estimateTokensFromText(args.question);
+			const now = Date.now();
+			const sandboxUsageHours = args.resources.length
+				? estimateSandboxUsageHours({ lastActiveAt: instance.lastActiveAt, now })
+				: 0;
+
+			const requiredTokensIn = inputTokens > 0 ? inputTokens : undefined;
+			const requiredTokensOut = 1;
+			const requiredSandboxHours = sandboxUsageHours > 0 ? sandboxUsageHours : undefined;
+
+			const [tokensIn, tokensOut, sandboxHours] = await Promise.all([
+				checkFeature({
+					customerId: autumnCustomer.id ?? instance.clerkId,
+					featureId: FEATURE_IDS.tokensIn,
+					requiredBalance: requiredTokensIn
+				}),
+				checkFeature({
+					customerId: autumnCustomer.id ?? instance.clerkId,
+					featureId: FEATURE_IDS.tokensOut,
+					requiredBalance: requiredTokensOut
+				}),
+				checkFeature({
+					customerId: autumnCustomer.id ?? instance.clerkId,
+					featureId: FEATURE_IDS.sandboxHours,
+					requiredBalance: requiredSandboxHours
+				})
+			]);
+
+			const hasEnough = (balance: number, required?: number) =>
+				required == null ? balance > 0 : balance >= required;
+
+			const ok =
+				hasEnough(tokensIn.balance, requiredTokensIn) &&
+				hasEnough(tokensOut.balance, requiredTokensOut) &&
+				hasEnough(sandboxHours.balance, requiredSandboxHours);
+
+			if (!ok) {
+				const limitTypes: string[] = [];
+				if (!hasEnough(tokensIn.balance, requiredTokensIn)) limitTypes.push('tokensIn');
+				if (!hasEnough(tokensOut.balance, requiredTokensOut)) limitTypes.push('tokensOut');
+				if (!hasEnough(sandboxHours.balance, requiredSandboxHours)) limitTypes.push('sandboxHours');
+
+				await ctx.scheduler.runAfter(0, internal.analytics.trackEvent, {
+					distinctId: instance.clerkId,
+					event: AnalyticsEvents.USAGE_LIMIT_REACHED,
+					properties: {
+						instanceId: args.instanceId,
+						limitTypes,
+						tokensInBalance: tokensIn.balance,
+						tokensOutBalance: tokensOut.balance,
+						sandboxHoursBalance: sandboxHours.balance
+					}
+				});
+			}
+
+			return {
+				ok,
+				reason: ok ? null : 'limit_reached',
+				metrics: {
+					tokensIn,
+					tokensOut,
+					sandboxHours
+				},
+				inputTokens,
+				sandboxUsageHours,
+				customerId: autumnCustomer.id ?? instance.clerkId
+			};
 		}
 
 		return {
-			ok,
-			reason: ok ? null : 'limit_reached',
-			metrics: {
-				tokensIn,
-				tokensOut,
-				sandboxHours
-			},
-			inputTokens,
-			sandboxUsageHours,
-			customerId: autumnCustomer.id ?? instance.clerkId
+			ok: false,
+			reason: 'subscription_required'
 		};
 	}
 });
@@ -318,40 +386,60 @@ export const finalizeUsage = action({
 			throw new Error('Instance not found');
 		}
 
+		const identity = await ctx.auth.getUserIdentity();
 		const autumnCustomer = await getOrCreateCustomer({
-			clerkId: instance.clerkId
+			clerkId: instance.clerkId,
+			email: identity?.email,
+			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
 		});
 
-		const outputTokens = estimateTokensFromChars(args.outputChars + args.reasoningChars);
-		const sandboxUsageHours = args.sandboxUsageHours ?? 0;
+		const activeProduct = getActiveProduct(autumnCustomer.products);
+		const isFreePlan = activeProduct?.id === 'free_plan';
+		const isProPlan = activeProduct?.id === 'btca_pro';
 
 		const tasks: Promise<void>[] = [];
-		if (args.questionTokens > 0) {
+
+		if (isFreePlan) {
 			tasks.push(
 				trackUsage({
 					customerId: autumnCustomer.id ?? instance.clerkId,
-					featureId: FEATURE_IDS.tokensIn,
-					value: args.questionTokens
+					featureId: FEATURE_IDS.chatMessages,
+					value: 1
 				})
 			);
 		}
-		if (outputTokens > 0) {
-			tasks.push(
-				trackUsage({
-					customerId: autumnCustomer.id ?? instance.clerkId,
-					featureId: FEATURE_IDS.tokensOut,
-					value: outputTokens
-				})
-			);
-		}
-		if (sandboxUsageHours > 0) {
-			tasks.push(
-				trackUsage({
-					customerId: autumnCustomer.id ?? instance.clerkId,
-					featureId: FEATURE_IDS.sandboxHours,
-					value: sandboxUsageHours
-				})
-			);
+
+		const outputTokens = isProPlan ? estimateTokensFromChars(args.outputChars + args.reasoningChars) : 0;
+		const sandboxUsageHours = isProPlan ? (args.sandboxUsageHours ?? 0) : 0;
+
+		if (isProPlan) {
+			if (args.questionTokens > 0) {
+				tasks.push(
+					trackUsage({
+						customerId: autumnCustomer.id ?? instance.clerkId,
+						featureId: FEATURE_IDS.tokensIn,
+						value: args.questionTokens
+					})
+				);
+			}
+			if (outputTokens > 0) {
+				tasks.push(
+					trackUsage({
+						customerId: autumnCustomer.id ?? instance.clerkId,
+						featureId: FEATURE_IDS.tokensOut,
+						value: outputTokens
+					})
+				);
+			}
+			if (sandboxUsageHours > 0) {
+				tasks.push(
+					trackUsage({
+						customerId: autumnCustomer.id ?? instance.clerkId,
+						featureId: FEATURE_IDS.sandboxHours,
+						value: sandboxUsageHours
+					})
+				);
+			}
 		}
 
 		await Promise.all(tasks);
@@ -372,16 +460,22 @@ export const getBillingSummary = action({
 			throw new Error('Instance not found');
 		}
 
+		const identity = await ctx.auth.getUserIdentity();
 		const autumnCustomer = await getOrCreateCustomer({
-			clerkId: instance.clerkId
+			clerkId: instance.clerkId,
+			email: identity?.email,
+			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
 		});
 		const activeProduct = getActiveProduct(autumnCustomer.products);
-		const plan = activeProduct ? 'pro' : 'none';
+		const isFreePlan = activeProduct?.id === 'free_plan';
+		const isProPlan = activeProduct?.id === 'btca_pro';
+		
+		const plan = isProPlan ? 'pro' : isFreePlan ? 'free' : 'none';
 		const status = activeProduct?.status
 			? (activeProduct.status as 'active' | 'trialing' | 'canceled')
 			: 'none';
 
-		const [tokensIn, tokensOut, sandboxHours] = await Promise.all([
+		const [tokensIn, tokensOut, sandboxHours, chatMessages] = await Promise.all([
 			checkFeature({
 				customerId: autumnCustomer.id ?? instance.clerkId,
 				featureId: FEATURE_IDS.tokensIn
@@ -393,6 +487,10 @@ export const getBillingSummary = action({
 			checkFeature({
 				customerId: autumnCustomer.id ?? instance.clerkId,
 				featureId: FEATURE_IDS.sandboxHours
+			}),
+			checkFeature({
+				customerId: autumnCustomer.id ?? instance.clerkId,
+				featureId: FEATURE_IDS.chatMessages
 			})
 		]);
 
@@ -406,7 +504,7 @@ export const getBillingSummary = action({
 			};
 		};
 
-		return {
+		const result: BillingSummaryResult = {
 			plan,
 			status,
 			currentPeriodEnd: activeProduct?.current_period_end ?? undefined,
@@ -421,6 +519,16 @@ export const getBillingSummary = action({
 				sandboxHours: toUsageMetric(sandboxHours)
 			}
 		};
+
+		if (isFreePlan) {
+			result.freeMessages = {
+				used: chatMessages.usage,
+				total: chatMessages.included,
+				remaining: chatMessages.balance
+			};
+		}
+
+		return result;
 	}
 });
 
@@ -444,8 +552,11 @@ export const createCheckoutSession = action({
 			}
 		});
 
+		const identity = await ctx.auth.getUserIdentity();
 		const autumnCustomer = await getOrCreateCustomer({
-			clerkId: instance.clerkId
+			clerkId: instance.clerkId,
+			email: identity?.email,
+			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
 		});
 
 		const autumn = getAutumnClient();
@@ -507,8 +618,11 @@ export const createBillingPortalSession = action({
 			}
 		});
 
+		const identity = await ctx.auth.getUserIdentity();
 		const autumnCustomer = await getOrCreateCustomer({
-			clerkId: instance.clerkId
+			clerkId: instance.clerkId,
+			email: identity?.email,
+			name: identity?.name ?? (identity?.givenName ? `${identity.givenName} ${identity.familyName ?? ''}`.trim() : undefined)
 		});
 		const autumn = getAutumnClient();
 		const payload = await autumn.customers.billingPortal(autumnCustomer.id ?? instance.clerkId, {

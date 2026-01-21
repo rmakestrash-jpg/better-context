@@ -30,8 +30,37 @@ class BillingStore {
 		);
 	}
 
+	get isOnFreePlan() {
+		return this._summary?.plan === 'free';
+	}
+
+	get freeMessagesRemaining() {
+		return this._summary?.freeMessages?.remaining ?? 0;
+	}
+
+	get freeMessagesTotal() {
+		return this._summary?.freeMessages?.total ?? 5;
+	}
+
+	get freeMessagesUsed() {
+		return this._summary?.freeMessages?.used ?? 0;
+	}
+
+	get canChat() {
+		if (this._summary?.plan === 'pro') {
+			return this._summary.status === 'active' || this._summary.status === 'trialing';
+		}
+		if (this._summary?.plan === 'free') {
+			return (this._summary.freeMessages?.remaining ?? 0) > 0;
+		}
+		return false;
+	}
+
 	get isOverLimit() {
 		if (!this._summary) return false;
+		if (this._summary.plan === 'free') {
+			return (this._summary.freeMessages?.remaining ?? 0) <= 0;
+		}
 		return (
 			this._summary.usage.tokensIn.isDepleted ||
 			this._summary.usage.tokensOut.isDepleted ||
