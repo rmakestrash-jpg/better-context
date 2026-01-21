@@ -85,9 +85,9 @@ export async function signOut() {
 /**
  * Open the sign-in modal
  */
-export function openSignIn(redirectUrl?: string) {
+export function openSignIn() {
 	if (clerk) {
-		clerk.openSignIn({ redirectUrl });
+		clerk.openSignIn({ redirectUrl: '/app' });
 	}
 }
 
