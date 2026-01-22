@@ -13,9 +13,15 @@ export function initAnalytics(): void {
 		return;
 	}
 
+	const analyticsHost = env.PUBLIC_ANALYTICS_HOST;
+	if (!analyticsHost) {
+		console.warn('PUBLIC_ANALYTICS_HOST is not set');
+		return;
+	}
+
 	posthog.init(posthogId, {
-		api_host: '/ingest',
-		ui_host: 'https://us.i.posthog.com',
+		api_host: analyticsHost,
+		ui_host: 'https://us.posthog.com',
 		capture_pageview: true,
 		capture_pageleave: true,
 		persistence: 'localStorage'

@@ -28,6 +28,8 @@
 		"server": "bun --watch apps/server/src/index.ts",
 		"sandbox": "bun run apps/sandbox/src/index.ts",
 		"sandbox:snapshot": "bun run apps/sandbox/src/snapshot.ts",
+		"analytics-proxy:build": "docker build -t btca-analytics-proxy apps/analytics-proxy",
+		"analytics-proxy:run": "docker run --rm -p 8080:8080 -e POSTHOG_CLOUD_REGION=us btca-analytics-proxy",
 		"build:all": "turbo build",
 		"build:cli": "turbo build --filter=btca",
 		"build:web": "turbo build --filter=@btca/web",
