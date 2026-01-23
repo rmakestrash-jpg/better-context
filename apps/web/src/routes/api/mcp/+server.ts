@@ -171,6 +171,6 @@ export const DELETE: RequestHandler = async ({ request }) => {
 		});
 	}
 
-	const response = await transport.respond(request);
+	const response = await transport.respond(request, auth.context);
 	return response ?? new Response('Not Found', { status: 404 });
 };
