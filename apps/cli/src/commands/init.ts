@@ -34,8 +34,6 @@ const CLI_AGENTS_SECTION = `## btca
 
 When you need up-to-date information about technologies used in this project, use btca to query source repositories directly.
 
-**Available resources**: (run \`btca config resources list\` to see configured resources)
-
 ### Usage
 
 Ask a question about one or more resources:
@@ -59,13 +57,7 @@ btca ask --question "@svelte @tailwind How do I style components?"
 
 ### Interactive Mode
 
-Start a chat session for deeper exploration:
-
-\`\`\`bash
-btca chat --resource svelte --resource effect
-\`\`\`
-
-Or use the TUI:
+Launch the TUI for interactive chat:
 
 \`\`\`bash
 btca
@@ -73,12 +65,26 @@ btca
 
 Then use \`@mentions\` to reference resources (e.g., "@svelte How do I create a store?")
 
+### Managing Resources
+
+\`\`\`bash
+# Add a git resource
+btca add https://github.com/owner/repo
+
+# Add a local directory
+btca add ./docs
+
+# Remove a resource
+btca remove <name>
+\`\`\`
+
 ### Configuration
 
-This project's btca resources are configured in \`btca.config.jsonc\` at the project root. To modify:
+This project's btca resources are configured in \`btca.config.jsonc\` at the project root. To change the AI model:
 
-- Edit the config file directly, or
-- Use \`btca config resources add/remove\` commands
+\`\`\`bash
+btca connect
+\`\`\`
 `;
 
 type SetupType = 'mcp' | 'cli';
@@ -343,7 +349,7 @@ async function handleCliSetup(cwd: string, configPath: string, force?: boolean):
 	console.log('\n--- Setup Complete (CLI) ---\n');
 	console.log('Next steps:');
 	console.log('  1. Add resources: btca add https://github.com/owner/repo');
-	console.log('     Or: btca config resources add -n <name> -t git -u <url>');
 	console.log('  2. Ask a question: btca ask -r <resource> -q "your question"');
+	console.log('  3. Or launch the TUI: btca');
 	console.log("\nRun 'btca --help' for more options.");
 }
