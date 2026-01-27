@@ -4,7 +4,7 @@
  */
 
 // TODO: Change back to 'https://btca.dev' before deploying!
-const DEFAULT_REMOTE_URL = 'http://localhost:5173';
+const DEFAULT_REMOTE_URL = 'https://btca.dev';
 
 // Local type definitions to avoid circular dependencies
 export interface GitResource {
