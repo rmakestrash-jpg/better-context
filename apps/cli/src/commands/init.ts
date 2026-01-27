@@ -4,10 +4,10 @@ import path from 'node:path';
 import * as readline from 'readline';
 
 const PROJECT_CONFIG_FILENAME = 'btca.config.jsonc';
-const CONFIG_SCHEMA_URL = 'https://btca.schema.json';
+const CONFIG_SCHEMA_URL = 'https://btca.dev/btca.schema.json';
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 const DEFAULT_PROVIDER = 'opencode';
-const MCP_DASHBOARD_URL = 'https://btca.dev/app/settings/mcp/';
+const MCP_DASHBOARD_URL = 'https://btca.dev/app/settings';
 
 // AGENTS.md section templates
 const MCP_AGENTS_SECTION = `## Better Context MCP
@@ -27,7 +27,7 @@ Use Better Context MCP for documentation/resource questions when you need source
 **Common errors**
 - "Invalid resources" → re-run \`listResources\` and use exact names.
 - "Instance is provisioning / error state" → wait or retry after a minute.
-- "Missing or invalid Authorization header" → MCP auth is invalid; fix it in \`https://btca.dev/app/settings/mcp/\`.
+- "Missing or invalid Authorization header" → MCP auth is invalid; fix it in \`https://btca.dev/app/settings/\`.
 `;
 
 const CLI_AGENTS_SECTION = `## btca
