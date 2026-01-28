@@ -342,12 +342,36 @@ async function trackUsage(args: {
 	}
 }
 
+const featureMetricsValidator = v.object({
+	usage: v.number(),
+	balance: v.number(),
+	included: v.number()
+});
+
 export const ensureUsageAvailable = action({
 	args: {
 		instanceId: v.id('instances'),
 		question: v.string(),
 		resources: v.array(v.string())
 	},
+	returns: v.union(
+		v.object({
+			ok: v.literal(false),
+			reason: v.union(v.literal('subscription_required'), v.literal('free_limit_reached'))
+		}),
+		v.object({
+			ok: v.boolean(),
+			reason: v.union(v.string(), v.null()),
+			metrics: v.object({
+				tokensIn: featureMetricsValidator,
+				tokensOut: featureMetricsValidator,
+				sandboxHours: featureMetricsValidator
+			}),
+			inputTokens: v.number(),
+			sandboxUsageHours: v.number(),
+			customerId: v.string()
+		})
+	),
 	handler: async (ctx, args): Promise<UsageCheckResult> => {
 		const instance = await requireInstanceOwnershipAction(ctx, args.instanceId);
 
@@ -497,6 +521,11 @@ export const finalizeUsage = action({
 		resources: v.array(v.string()),
 		sandboxUsageHours: v.optional(v.number())
 	},
+	returns: v.object({
+		outputTokens: v.number(),
+		sandboxUsageHours: v.number(),
+		customerId: v.string()
+	}),
 	handler: async (ctx, args): Promise<FinalizeUsageResult> => {
 		const instance = await requireInstanceOwnershipAction(ctx, args.instanceId);
 
@@ -572,8 +601,39 @@ export const finalizeUsage = action({
 	}
 });
 
+const usageMetricDisplayValidator = v.object({
+	usedPct: v.number(),
+	remainingPct: v.number(),
+	isDepleted: v.boolean()
+});
+
 export const getBillingSummary = action({
 	args: billingArgs,
+	returns: v.object({
+		plan: v.union(v.literal('pro'), v.literal('free'), v.literal('none')),
+		status: v.union(
+			v.literal('active'),
+			v.literal('trialing'),
+			v.literal('canceled'),
+			v.literal('none')
+		),
+		currentPeriodEnd: v.optional(v.number()),
+		canceledAt: v.optional(v.number()),
+		customer: v.object({ name: v.null(), email: v.null() }),
+		paymentMethod: v.any(),
+		usage: v.object({
+			tokensIn: usageMetricDisplayValidator,
+			tokensOut: usageMetricDisplayValidator,
+			sandboxHours: usageMetricDisplayValidator
+		}),
+		freeMessages: v.optional(
+			v.object({
+				used: v.number(),
+				total: v.number(),
+				remaining: v.number()
+			})
+		)
+	}),
 	handler: async (ctx, args): Promise<BillingSummaryResult> => {
 		const instance = await requireInstanceOwnershipAction(ctx, args.instanceId);
 
@@ -667,6 +727,7 @@ export const createCheckoutSession = action({
 		instanceId: v.id('instances'),
 		baseUrl: v.string()
 	},
+	returns: v.object({ url: v.string() }),
 	handler: async (ctx, args): Promise<SessionResult> => {
 		const instance = await requireInstanceOwnershipAction(ctx, args.instanceId);
 
@@ -726,6 +787,7 @@ export const createBillingPortalSession = action({
 		instanceId: v.id('instances'),
 		baseUrl: v.string()
 	},
+	returns: v.object({ url: v.string() }),
 	handler: async (ctx, args): Promise<SessionResult> => {
 		const instance = await requireInstanceOwnershipAction(ctx, args.instanceId);
 

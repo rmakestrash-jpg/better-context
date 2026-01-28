@@ -14,6 +14,15 @@ export const listProjectsInternal = internalQuery({
 	args: {
 		instanceId: v.id('instances')
 	},
+	returns: v.array(
+		v.object({
+			_id: v.string(),
+			name: v.string(),
+			model: v.optional(v.string()),
+			isDefault: v.boolean(),
+			createdAt: v.number()
+		})
+	),
 	handler: async (ctx, args) => {
 		const projects = await ctx.db
 			.query('projects')
@@ -44,6 +53,14 @@ export const listThreadsInternal = internalQuery({
 		instanceId: v.id('instances'),
 		projectName: v.optional(v.string())
 	},
+	returns: v.array(
+		v.object({
+			_id: v.string(),
+			title: v.optional(v.string()),
+			createdAt: v.number(),
+			lastActivityAt: v.number()
+		})
+	),
 	handler: async (ctx, args) => {
 		let threads = await ctx.db
 			.query('threads')
@@ -85,6 +102,27 @@ export const getThreadInternal = internalQuery({
 		instanceId: v.id('instances'),
 		threadId: v.string()
 	},
+	returns: v.union(
+		v.null(),
+		v.object({
+			thread: v.object({
+				_id: v.string(),
+				title: v.optional(v.string()),
+				createdAt: v.number(),
+				lastActivityAt: v.number()
+			}),
+			messages: v.array(
+				v.object({
+					_id: v.string(),
+					threadId: v.string(),
+					role: v.string(),
+					content: v.string(),
+					resources: v.optional(v.array(v.string())),
+					createdAt: v.number()
+				})
+			)
+		})
+	),
 	handler: async (ctx, args) => {
 		// Get thread
 		const thread = await ctx.db.get(args.threadId as Id<'threads'>);
@@ -125,6 +163,16 @@ export const listQuestionsInternal = internalQuery({
 	args: {
 		projectId: v.id('projects')
 	},
+	returns: v.array(
+		v.object({
+			_id: v.string(),
+			projectId: v.string(),
+			question: v.string(),
+			resources: v.array(v.string()),
+			answer: v.string(),
+			createdAt: v.number()
+		})
+	),
 	handler: async (ctx, args) => {
 		const questions = await ctx.db
 			.query('mcpQuestions')

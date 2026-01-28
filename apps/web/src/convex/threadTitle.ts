@@ -30,6 +30,7 @@ export const generateTitle = internalAction({
 	args: {
 		firstMessage: v.string()
 	},
+	returns: v.string(),
 	handler: async (_ctx: ActionCtx, args: { firstMessage: string }): Promise<string> => {
 		const opencodeZen = getOpencodeZen();
 
@@ -72,10 +73,11 @@ export const generateAndUpdateTitle = internalAction({
 		threadId: v.id('threads'),
 		firstMessage: v.string()
 	},
+	returns: v.null(),
 	handler: async (
 		ctx: ActionCtx,
 		args: { threadId: Id<'threads'>; firstMessage: string }
-	): Promise<void> => {
+	): Promise<null> => {
 		const opencodeZen = getOpencodeZen();
 
 		const { text } = await generateText({
@@ -109,5 +111,6 @@ Rules:
 			threadId: args.threadId,
 			title: cleanedTitle
 		});
+		return null;
 	}
 });

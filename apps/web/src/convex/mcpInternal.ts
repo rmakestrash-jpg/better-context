@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 
 import type { Id } from './_generated/dataModel';
 import { internalMutation } from './_generated/server';
@@ -12,6 +12,7 @@ export const createProjectInternal = internalMutation({
 		name: v.string(),
 		isDefault: v.boolean()
 	},
+	returns: v.id('projects'),
 	handler: async (ctx, args): Promise<Id<'projects'>> => {
 		// Double-check it doesn't exist (race condition protection)
 		const existing = await ctx.db
@@ -44,6 +45,7 @@ export const recordQuestion = internalMutation({
 		resources: v.array(v.string()),
 		answer: v.string()
 	},
+	returns: v.id('mcpQuestions'),
 	handler: async (ctx, args) => {
 		return await ctx.db.insert('mcpQuestions', {
 			projectId: args.projectId,
@@ -68,16 +70,21 @@ export const addResourceInternal = internalMutation({
 		searchPath: v.optional(v.string()),
 		specialNotes: v.optional(v.string())
 	},
+	returns: v.id('userResources'),
 	handler: async (ctx, args): Promise<Id<'userResources'>> => {
-		// Check if resource with this name already exists for this instance
+		// Check if resource with this name already exists for this instance using compound index
 		const existing = await ctx.db
 			.query('userResources')
-			.withIndex('by_instance', (q) => q.eq('instanceId', args.instanceId))
-			.filter((q) => q.eq(q.field('name'), args.name))
+			.withIndex('by_instance_and_name', (q) =>
+				q.eq('instanceId', args.instanceId).eq('name', args.name)
+			)
 			.first();
 
 		if (existing) {
-			throw new Error(`Resource "${args.name}" already exists`);
+			throw new ConvexError({
+				code: 'ALREADY_EXISTS',
+				message: `Resource "${args.name}" already exists`
+			});
 		}
 
 		return await ctx.db.insert('userResources', {
@@ -106,15 +113,18 @@ export const updateResourceInternal = internalMutation({
 		searchPath: v.optional(v.string()),
 		specialNotes: v.optional(v.string())
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
+		// Use compound index for efficient lookup
 		const existing = await ctx.db
 			.query('userResources')
-			.withIndex('by_instance', (q) => q.eq('instanceId', args.instanceId))
-			.filter((q) => q.eq(q.field('name'), args.name))
+			.withIndex('by_instance_and_name', (q) =>
+				q.eq('instanceId', args.instanceId).eq('name', args.name)
+			)
 			.first();
 
 		if (!existing) {
-			throw new Error(`Resource "${args.name}" not found`);
+			throw new ConvexError({ code: 'NOT_FOUND', message: `Resource "${args.name}" not found` });
 		}
 
 		await ctx.db.patch(existing._id, {
@@ -123,6 +133,7 @@ export const updateResourceInternal = internalMutation({
 			searchPath: args.searchPath,
 			specialNotes: args.specialNotes
 		});
+		return null;
 	}
 });
 
@@ -134,9 +145,11 @@ export const updateProjectModelInternal = internalMutation({
 		projectId: v.id('projects'),
 		model: v.string()
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.projectId, {
 			model: args.model
 		});
+		return null;
 	}
 });

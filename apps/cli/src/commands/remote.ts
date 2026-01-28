@@ -6,63 +6,15 @@ import {
 	type GitResource,
 	type RemoteConfig
 } from '../client/remote.ts';
+import { loadAuth, saveAuth, deleteAuth, type RemoteAuth } from '../lib/auth.ts';
 import { dim, green, red, yellow, bold } from '../lib/utils/colors.ts';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Config Constants (duplicated to avoid server import)
+// Config Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GLOBAL_CONFIG_DIR = '~/.config/btca';
-const REMOTE_AUTH_FILENAME = 'remote-auth.json';
 const REMOTE_CONFIG_FILENAME = 'btca.remote.config.jsonc';
 const REMOTE_CONFIG_SCHEMA_URL = 'https://btca.dev/btca.remote.schema.json';
-
-const expandHome = (filePath: string): string => {
-	const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
-	if (filePath.startsWith('~/')) return home + filePath.slice(1);
-	return filePath;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Auth Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface RemoteAuth {
-	apiKey: string;
-	linkedAt: number;
-}
-
-async function getAuthPath(): Promise<string> {
-	return `${expandHome(GLOBAL_CONFIG_DIR)}/${REMOTE_AUTH_FILENAME}`;
-}
-
-async function loadAuth(): Promise<RemoteAuth | null> {
-	const authPath = await getAuthPath();
-	try {
-		const content = await Bun.file(authPath).text();
-		return JSON.parse(content) as RemoteAuth;
-	} catch {
-		return null;
-	}
-}
-
-async function saveAuth(auth: RemoteAuth): Promise<void> {
-	const authPath = await getAuthPath();
-	const configDir = authPath.slice(0, authPath.lastIndexOf('/'));
-
-	await Bun.write(`${configDir}/.keep`, '');
-	await Bun.write(authPath, JSON.stringify(auth, null, 2));
-}
-
-async function deleteAuth(): Promise<void> {
-	const authPath = await getAuthPath();
-	try {
-		const fs = await import('node:fs/promises');
-		await fs.unlink(authPath);
-	} catch {
-		// Ignore if file doesn't exist
-	}
-}
 
 async function requireAuth(): Promise<RemoteClient> {
 	const auth = await loadAuth();
@@ -503,7 +455,7 @@ async function addRemoteResourceWizard(url: string): Promise<void> {
 
 		if (!config) {
 			const projectRl = createRl();
-			const projectName = await promptInput(projectRl, 'Project name for remote config');
+			const projectName = await promptInput(projectRl, 'Project name for remote config', 'default');
 			projectRl.close();
 
 			if (!projectName) {
@@ -606,7 +558,7 @@ const addCommand = new Command('add')
 
 					if (!config) {
 						const rl = createRl();
-						const projectName = await promptInput(rl, 'Project name for remote config');
+						const projectName = await promptInput(rl, 'Project name for remote config', 'default');
 						rl.close();
 
 						if (!projectName) {
@@ -845,7 +797,7 @@ const initCommand = new Command('init')
 
 			if (!projectName) {
 				const rl = createRl();
-				projectName = await promptInput(rl, 'Project name');
+				projectName = await promptInput(rl, 'Project name', 'default');
 				rl.close();
 			}
 
@@ -874,6 +826,123 @@ const initCommand = new Command('init')
 	});
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MCP Config Templates
+// ─────────────────────────────────────────────────────────────────────────────
+
+type McpAgent = 'opencode' | 'claude' | 'cursor';
+
+const MCP_API_KEY_URL = 'https://btca.dev/app/settings?tab=mcp';
+
+function getMcpConfig(agent: McpAgent, apiKey: string): object {
+	const baseConfig = {
+		command: 'npx',
+		args: ['-y', '@anthropic-ai/mcp-remote', 'https://btca.dev/api/mcp'],
+		env: {
+			API_KEY: apiKey
+		}
+	};
+
+	switch (agent) {
+		case 'opencode':
+			return {
+				mcpServers: {
+					btca: baseConfig
+				}
+			};
+		case 'claude':
+			return {
+				mcpServers: {
+					btca: baseConfig
+				}
+			};
+		case 'cursor':
+			return {
+				mcpServers: {
+					btca: baseConfig
+				}
+			};
+	}
+}
+
+function getMcpInstructions(agent: McpAgent): string {
+	switch (agent) {
+		case 'opencode':
+			return `Add this to your ${bold('opencode.json')} file:`;
+		case 'claude':
+			return `Add this to your ${bold('claude_desktop_config.json')} file:`;
+		case 'cursor':
+			return `Add this to your ${bold('.cursor/mcp.json')} file:`;
+	}
+}
+
+/**
+ * btca remote mcp - Output MCP configuration for various agents
+ */
+const mcpCommand = new Command('mcp')
+	.description('Output MCP configuration for your AI agent')
+	.argument('[agent]', 'Agent type: opencode, claude, or cursor')
+	.action(async (agent?: string) => {
+		try {
+			const auth = await loadAuth();
+			if (!auth) {
+				console.error(red('Not authenticated with remote.'));
+				console.error(`\nGet your API key from: ${bold(MCP_API_KEY_URL)}`);
+				console.error(`Then run ${bold('btca remote link')} to authenticate.`);
+				process.exit(1);
+			}
+
+			let selectedAgent: McpAgent;
+
+			if (agent) {
+				const normalized = agent.toLowerCase();
+				if (normalized !== 'opencode' && normalized !== 'claude' && normalized !== 'cursor') {
+					console.error(red(`Invalid agent: ${agent}`));
+					console.error('Valid options: opencode, claude, cursor');
+					process.exit(1);
+				}
+				selectedAgent = normalized as McpAgent;
+			} else {
+				// Prompt user to select agent
+				console.log('\nSelect your AI agent:\n');
+				console.log('  1) OpenCode');
+				console.log('  2) Claude Desktop');
+				console.log('  3) Cursor');
+				console.log('');
+
+				const rl = createRl();
+				const answer = await new Promise<string>((resolve) => {
+					rl.question('Enter number: ', (ans) => {
+						rl.close();
+						resolve(ans.trim());
+					});
+				});
+
+				const num = parseInt(answer, 10);
+				if (num === 1) {
+					selectedAgent = 'opencode';
+				} else if (num === 2) {
+					selectedAgent = 'claude';
+				} else if (num === 3) {
+					selectedAgent = 'cursor';
+				} else {
+					console.error(red('Invalid selection.'));
+					process.exit(1);
+				}
+			}
+
+			const config = getMcpConfig(selectedAgent, auth.apiKey);
+			const instructions = getMcpInstructions(selectedAgent);
+
+			console.log(`\n${instructions}\n`);
+			console.log(JSON.stringify(config, null, 2));
+			console.log('');
+		} catch (error) {
+			console.error(formatError(error));
+			process.exit(1);
+		}
+	});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main Remote Command
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -887,4 +956,5 @@ export const remoteCommand = new Command('remote')
 	.addCommand(syncCommand)
 	.addCommand(askCommand)
 	.addCommand(grabCommand)
-	.addCommand(initCommand);
+	.addCommand(initCommand)
+	.addCommand(mcpCommand);

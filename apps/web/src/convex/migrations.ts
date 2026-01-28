@@ -1,4 +1,5 @@
 import { Migrations } from '@convex-dev/migrations';
+import { v } from 'convex/values';
 
 import { components, internal } from './_generated/api';
 import type { DataModel, Id } from './_generated/dataModel';
@@ -117,6 +118,14 @@ export const runAll = migrations.runner([
  */
 export const getMigrationStatus = internalQuery({
 	args: {},
+	returns: v.object({
+		totalInstances: v.number(),
+		totalProjects: v.number(),
+		threadsWithoutProject: v.number(),
+		userResourcesWithoutProject: v.number(),
+		cachedResourcesWithoutProject: v.number(),
+		migrationComplete: v.boolean()
+	}),
 	handler: async (ctx) => {
 		const totalInstances = (await ctx.db.query('instances').collect()).length;
 		const totalProjects = (await ctx.db.query('projects').collect()).length;
@@ -162,6 +171,7 @@ export const getMigrationStatus = internalQuery({
  */
 export const getInstancesWithoutDefaultProject = internalQuery({
 	args: {},
+	returns: v.array(v.id('instances')),
 	handler: async (ctx) => {
 		const instances = await ctx.db.query('instances').collect();
 		const results: Id<'instances'>[] = [];
@@ -189,6 +199,10 @@ export const getInstancesWithoutDefaultProject = internalQuery({
  */
 export const createMissingDefaultProjects = internalMutation({
 	args: {},
+	returns: v.object({
+		created: v.number(),
+		total: v.number()
+	}),
 	handler: async (ctx) => {
 		const instances = await ctx.db.query('instances').collect();
 		let created = 0;

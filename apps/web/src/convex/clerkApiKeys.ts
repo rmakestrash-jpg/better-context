@@ -72,6 +72,18 @@ export type ApiKeyValidationResult =
  */
 export const validate = action({
 	args: { apiKey: v.string() },
+	returns: v.union(
+		v.object({
+			valid: v.literal(true),
+			clerkApiKeyId: v.string(),
+			clerkUserId: v.string(),
+			instanceId: v.id('instances')
+		}),
+		v.object({
+			valid: v.literal(false),
+			error: v.string()
+		})
+	),
 	handler: async (ctx, args): Promise<ApiKeyValidationResult> => {
 		const { apiKey } = args;
 

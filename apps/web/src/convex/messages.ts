@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { mutation, query } from './_generated/server';
@@ -47,6 +47,7 @@ export const addUserMessage = mutation({
 		content: v.string(),
 		resources: v.array(v.string())
 	},
+	returns: v.id('messages'),
 	handler: async (ctx, args) => {
 		const { thread } = await requireThreadOwnership(ctx, args.threadId);
 
@@ -103,6 +104,7 @@ export const addAssistantMessage = mutation({
 		content: messageContentValidator,
 		canceled: v.optional(v.boolean())
 	},
+	returns: v.id('messages'),
 	handler: async (ctx, args) => {
 		await requireThreadOwnership(ctx, args.threadId);
 
@@ -129,6 +131,7 @@ export const addSystemMessage = mutation({
 		threadId: v.id('threads'),
 		content: v.string()
 	},
+	returns: v.id('messages'),
 	handler: async (ctx, args) => {
 		await requireThreadOwnership(ctx, args.threadId);
 
@@ -141,11 +144,24 @@ export const addSystemMessage = mutation({
 	}
 });
 
+// Message validator for return types
+const messageValidator = v.object({
+	_id: v.id('messages'),
+	_creationTime: v.number(),
+	threadId: v.id('threads'),
+	role: v.union(v.literal('user'), v.literal('assistant'), v.literal('system')),
+	content: messageContentValidator,
+	resources: v.optional(v.array(v.string())),
+	canceled: v.optional(v.boolean()),
+	createdAt: v.number()
+});
+
 /**
  * Get all messages for a thread (requires ownership)
  */
 export const getByThread = query({
 	args: { threadId: v.id('threads') },
+	returns: v.array(messageValidator),
 	handler: async (ctx, args) => {
 		await requireThreadOwnership(ctx, args.threadId);
 
@@ -166,9 +182,11 @@ export const updateAssistantMessage = mutation({
 		messageId: v.id('messages'),
 		content: messageContentValidator
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await requireMessageOwnership(ctx, args.messageId);
 		await ctx.db.patch(args.messageId, { content: args.content });
+		return null;
 	}
 });
 
@@ -177,9 +195,11 @@ export const updateAssistantMessage = mutation({
  */
 export const markCanceled = mutation({
 	args: { messageId: v.id('messages') },
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await requireMessageOwnership(ctx, args.messageId);
 		await ctx.db.patch(args.messageId, { canceled: true });
+		return null;
 	}
 });
 
@@ -191,12 +211,13 @@ export const deleteMessageAndAfter = mutation({
 		threadId: v.id('threads'),
 		messageId: v.id('messages')
 	},
+	returns: v.object({ deletedCount: v.number() }),
 	handler: async (ctx, args) => {
 		await requireThreadOwnership(ctx, args.threadId);
 
 		const targetMessage = await ctx.db.get(args.messageId);
 		if (!targetMessage || targetMessage.threadId !== args.threadId) {
-			throw new Error('Message not found in thread');
+			throw new ConvexError({ code: 'NOT_FOUND', message: 'Message not found in thread' });
 		}
 
 		const allMessages = await ctx.db

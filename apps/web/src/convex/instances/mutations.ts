@@ -18,6 +18,7 @@ const instanceStateValidator = v.union(
 
 export const create = mutation({
 	args: { clerkId: v.string() },
+	returns: v.id('instances'),
 	handler: async (ctx, args) => {
 		const existing = await ctx.db
 			.query('instances')
@@ -49,8 +50,10 @@ export const updateState = mutation({
 		instanceId: v.id('instances'),
 		state: instanceStateValidator
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.instanceId, { state: args.state });
+		return null;
 	}
 });
 
@@ -62,6 +65,7 @@ export const setProvisioned = mutation({
 		opencodeVersion: v.optional(v.string()),
 		storageUsedBytes: v.optional(v.number())
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		const patch: {
 			sandboxId: string;
@@ -89,6 +93,7 @@ export const setProvisioned = mutation({
 		}
 
 		await ctx.db.patch(args.instanceId, patch);
+		return null;
 	}
 });
 
@@ -97,8 +102,10 @@ export const setServerUrl = mutation({
 		instanceId: v.id('instances'),
 		serverUrl: v.string()
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.instanceId, { serverUrl: args.serverUrl });
+		return null;
 	}
 });
 
@@ -107,6 +114,7 @@ export const setError = mutation({
 		instanceId: v.id('instances'),
 		errorMessage: v.string()
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		const instance = await ctx.db.get(args.instanceId);
 		const previousState = instance?.state;
@@ -127,13 +135,16 @@ export const setError = mutation({
 				}
 			});
 		}
+		return null;
 	}
 });
 
 export const clearError = mutation({
 	args: { instanceId: v.id('instances') },
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.instanceId, { errorMessage: undefined });
+		return null;
 	}
 });
 
@@ -146,6 +157,7 @@ export const setVersions = mutation({
 		latestOpencodeVersion: v.optional(v.string()),
 		lastVersionCheck: v.optional(v.number())
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		const patch: {
 			btcaVersion?: string;
@@ -174,13 +186,16 @@ export const setVersions = mutation({
 		}
 
 		await ctx.db.patch(args.instanceId, patch);
+		return null;
 	}
 });
 
 export const touchActivity = mutation({
 	args: { instanceId: v.id('instances') },
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.instanceId, { lastActiveAt: Date.now() });
+		return null;
 	}
 });
 
@@ -189,8 +204,10 @@ export const updateStorageUsed = mutation({
 		instanceId: v.id('instances'),
 		storageUsedBytes: v.number()
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.instanceId, { storageUsedBytes: args.storageUsedBytes });
+		return null;
 	}
 });
 
@@ -208,6 +225,7 @@ export const setSubscriptionState = mutation({
 		currentPeriodEnd: v.optional(v.number()),
 		canceledAt: v.optional(v.number())
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.patch(args.instanceId, {
 			subscriptionPlan: args.plan,
@@ -217,6 +235,7 @@ export const setSubscriptionState = mutation({
 			subscriptionCanceledAt: args.canceledAt,
 			subscriptionUpdatedAt: Date.now()
 		});
+		return null;
 	}
 });
 
@@ -232,6 +251,7 @@ export const upsertCachedResources = mutation({
 			})
 		)
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		const existing = await ctx.db
 			.query('cachedResources')
@@ -262,20 +282,27 @@ export const upsertCachedResources = mutation({
 				});
 			}
 		}
+		return null;
 	}
 });
 
 export const scheduleSyncSandboxStatus = mutation({
 	args: { instanceId: v.id('instances') },
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.scheduler.runAfter(0, instances.internalActions.syncSandboxStatus, {
 			instanceId: args.instanceId
 		});
+		return null;
 	}
 });
 
 export const handleSandboxStopped = mutation({
 	args: { sandboxId: v.string() },
+	returns: v.union(
+		v.object({ updated: v.literal(false), reason: v.string() }),
+		v.object({ updated: v.literal(true), instanceId: v.id('instances') })
+	),
 	handler: async (ctx, args) => {
 		const instance = await ctx.db
 			.query('instances')
@@ -283,11 +310,11 @@ export const handleSandboxStopped = mutation({
 			.first();
 
 		if (!instance) {
-			return { updated: false, reason: 'instance_not_found' };
+			return { updated: false as const, reason: 'instance_not_found' };
 		}
 
 		if (instance.state === 'stopped') {
-			return { updated: false, reason: 'already_stopped' };
+			return { updated: false as const, reason: 'already_stopped' };
 		}
 
 		const wasAutoStopped = instance.state === 'running';
@@ -307,12 +334,16 @@ export const handleSandboxStopped = mutation({
 			}
 		});
 
-		return { updated: true, instanceId: instance._id };
+		return { updated: true as const, instanceId: instance._id };
 	}
 });
 
 export const handleSandboxStarted = mutation({
 	args: { sandboxId: v.string() },
+	returns: v.union(
+		v.object({ updated: v.literal(false), reason: v.string() }),
+		v.object({ updated: v.literal(true), instanceId: v.id('instances') })
+	),
 	handler: async (ctx, args) => {
 		const instance = await ctx.db
 			.query('instances')
@@ -320,17 +351,17 @@ export const handleSandboxStarted = mutation({
 			.first();
 
 		if (!instance) {
-			return { updated: false, reason: 'instance_not_found' };
+			return { updated: false as const, reason: 'instance_not_found' };
 		}
 
 		if (instance.state === 'running' || instance.state === 'starting') {
-			return { updated: false, reason: 'already_running_or_starting' };
+			return { updated: false as const, reason: 'already_running_or_starting' };
 		}
 
 		await ctx.db.patch(instance._id, {
 			state: 'starting'
 		});
 
-		return { updated: true, instanceId: instance._id };
+		return { updated: true as const, instanceId: instance._id };
 	}
 });

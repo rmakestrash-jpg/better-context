@@ -43,6 +43,28 @@ export const getInstanceStatus = action({
 		apiKey: v.string(),
 		project: v.optional(v.string())
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({
+			ok: v.literal(true),
+			instance: v.object({
+				_id: v.string(),
+				state: v.string(),
+				serverUrl: v.optional(v.string()),
+				btcaVersion: v.optional(v.string()),
+				subscriptionPlan: v.optional(v.string())
+			}),
+			project: v.optional(
+				v.object({
+					_id: v.string(),
+					name: v.string(),
+					model: v.optional(v.string()),
+					isDefault: v.boolean(),
+					createdAt: v.number()
+				})
+			)
+		})
+	),
 	handler: async (ctx, args): Promise<StatusResult> => {
 		const { apiKey, project: projectName } = args;
 
@@ -102,6 +124,10 @@ export const wakeInstance = action({
 	args: {
 		apiKey: v.string()
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({ ok: v.literal(true), serverUrl: v.string() })
+	),
 	handler: async (ctx, args): Promise<WakeResult> => {
 		const { apiKey } = args;
 
@@ -162,6 +188,21 @@ export const listProjects = action({
 	args: {
 		apiKey: v.string()
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({
+			ok: v.literal(true),
+			projects: v.array(
+				v.object({
+					_id: v.string(),
+					name: v.string(),
+					model: v.optional(v.string()),
+					isDefault: v.boolean(),
+					createdAt: v.number()
+				})
+			)
+		})
+	),
 	handler: async (ctx, args): Promise<ProjectsResult> => {
 		const { apiKey } = args;
 
@@ -202,6 +243,20 @@ export const listThreads = action({
 		apiKey: v.string(),
 		project: v.optional(v.string())
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({
+			ok: v.literal(true),
+			threads: v.array(
+				v.object({
+					_id: v.string(),
+					title: v.optional(v.string()),
+					createdAt: v.number(),
+					lastActivityAt: v.number()
+				})
+			)
+		})
+	),
 	handler: async (ctx, args): Promise<ThreadsResult> => {
 		const { apiKey, project: projectName } = args;
 
@@ -253,6 +308,28 @@ export const getThread = action({
 		apiKey: v.string(),
 		threadId: v.string()
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({
+			ok: v.literal(true),
+			thread: v.object({
+				_id: v.string(),
+				title: v.optional(v.string()),
+				createdAt: v.number(),
+				lastActivityAt: v.number()
+			}),
+			messages: v.array(
+				v.object({
+					_id: v.string(),
+					threadId: v.string(),
+					role: v.string(),
+					content: v.string(),
+					resources: v.optional(v.array(v.string())),
+					createdAt: v.number()
+				})
+			)
+		})
+	),
 	handler: async (ctx, args): Promise<ThreadResult> => {
 		const { apiKey, threadId } = args;
 
@@ -302,6 +379,22 @@ export const listQuestions = action({
 		apiKey: v.string(),
 		project: v.string()
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({
+			ok: v.literal(true),
+			questions: v.array(
+				v.object({
+					_id: v.string(),
+					projectId: v.string(),
+					question: v.string(),
+					resources: v.array(v.string()),
+					answer: v.string(),
+					createdAt: v.number()
+				})
+			)
+		})
+	),
 	handler: async (ctx, args): Promise<QuestionsResult> => {
 		const { apiKey, project: projectName } = args;
 

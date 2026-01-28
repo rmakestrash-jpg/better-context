@@ -1,6 +1,56 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 
 import { internalQuery, query } from '../_generated/server';
+
+// Instance validator
+const instanceValidator = v.object({
+	_id: v.id('instances'),
+	_creationTime: v.number(),
+	clerkId: v.string(),
+	sandboxId: v.optional(v.string()),
+	state: v.union(
+		v.literal('unprovisioned'),
+		v.literal('provisioning'),
+		v.literal('stopped'),
+		v.literal('starting'),
+		v.literal('running'),
+		v.literal('stopping'),
+		v.literal('updating'),
+		v.literal('error')
+	),
+	serverUrl: v.optional(v.string()),
+	errorMessage: v.optional(v.string()),
+	btcaVersion: v.optional(v.string()),
+	opencodeVersion: v.optional(v.string()),
+	latestBtcaVersion: v.optional(v.string()),
+	latestOpencodeVersion: v.optional(v.string()),
+	lastVersionCheck: v.optional(v.number()),
+	subscriptionPlan: v.optional(v.union(v.literal('pro'), v.literal('free'), v.literal('none'))),
+	subscriptionStatus: v.optional(
+		v.union(v.literal('active'), v.literal('trialing'), v.literal('canceled'), v.literal('none'))
+	),
+	subscriptionProductId: v.optional(v.string()),
+	subscriptionCurrentPeriodEnd: v.optional(v.number()),
+	subscriptionCanceledAt: v.optional(v.number()),
+	subscriptionUpdatedAt: v.optional(v.number()),
+	storageUsedBytes: v.optional(v.number()),
+	lastActiveAt: v.optional(v.number()),
+	provisionedAt: v.optional(v.number()),
+	createdAt: v.number()
+});
+
+const cachedResourceValidator = v.object({
+	_id: v.id('cachedResources'),
+	_creationTime: v.number(),
+	instanceId: v.id('instances'),
+	projectId: v.optional(v.id('projects')),
+	name: v.string(),
+	url: v.string(),
+	branch: v.string(),
+	sizeBytes: v.optional(v.number()),
+	cachedAt: v.number(),
+	lastUsedAt: v.number()
+});
 
 /**
  * Internal query to get instance by ID (for use by other internal functions)
@@ -8,6 +58,7 @@ import { internalQuery, query } from '../_generated/server';
  */
 export const getInternal = internalQuery({
 	args: { id: v.id('instances') },
+	returns: v.union(v.null(), instanceValidator),
 	handler: async (ctx, args) => {
 		return await ctx.db.get(args.id);
 	}
@@ -19,10 +70,11 @@ export const getInternal = internalQuery({
  */
 export const get = query({
 	args: { id: v.id('instances') },
+	returns: v.union(v.null(), instanceValidator),
 	handler: async (ctx, args) => {
 		const identity = await ctx.auth.getUserIdentity();
 		if (!identity) {
-			throw new Error('Unauthorized: Authentication required');
+			throw new ConvexError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
 		}
 
 		const instance = await ctx.db.get(args.id);
@@ -32,7 +84,7 @@ export const get = query({
 
 		// Verify the caller owns this instance
 		if (instance.clerkId !== identity.subject) {
-			throw new Error('Unauthorized: Access denied');
+			throw new ConvexError({ code: 'FORBIDDEN', message: 'Access denied' });
 		}
 
 		return instance;
@@ -41,6 +93,7 @@ export const get = query({
 
 export const getBySandboxId = internalQuery({
 	args: { sandboxId: v.string() },
+	returns: v.union(v.null(), instanceValidator),
 	handler: async (ctx, args) => {
 		return await ctx.db
 			.query('instances')
@@ -54,6 +107,7 @@ export const getBySandboxId = internalQuery({
  */
 export const getByClerkId = query({
 	args: {},
+	returns: v.union(v.null(), instanceValidator),
 	handler: async (ctx) => {
 		const identity = await ctx.auth.getUserIdentity();
 		if (!identity) {
@@ -73,6 +127,7 @@ export const getByClerkId = query({
  */
 export const getByClerkIdInternal = internalQuery({
 	args: { clerkId: v.string() },
+	returns: v.union(v.null(), instanceValidator),
 	handler: async (ctx, args) => {
 		return await ctx.db
 			.query('instances')
@@ -86,6 +141,13 @@ export const getByClerkIdInternal = internalQuery({
  */
 export const getStatus = query({
 	args: {},
+	returns: v.union(
+		v.null(),
+		v.object({
+			instance: instanceValidator,
+			cachedResources: v.array(cachedResourceValidator)
+		})
+	),
 	handler: async (ctx) => {
 		const identity = await ctx.auth.getUserIdentity();
 		if (!identity) {

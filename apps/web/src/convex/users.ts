@@ -1,3 +1,5 @@
+import { v } from 'convex/values';
+
 import { mutation } from './_generated/server';
 import { create as createInstance } from './instances/mutations';
 import { getByClerkId as getInstance } from './instances/queries';
@@ -12,12 +14,14 @@ export const getOrCreate = createInstance;
  */
 export const updateSandboxActivity = mutation({
 	args: {},
+	returns: v.null(),
 	handler: async (ctx) => {
 		const instance = await getAuthenticatedInstance(ctx);
 
 		await ctx.db.patch(instance._id, {
 			lastActiveAt: Date.now()
 		});
+		return null;
 	}
 });
 
@@ -26,12 +30,14 @@ export const updateSandboxActivity = mutation({
  */
 export const touchMcpUsage = mutation({
 	args: {},
+	returns: v.null(),
 	handler: async (ctx) => {
 		const instance = await getAuthenticatedInstance(ctx);
 
 		await ctx.db.patch(instance._id, {
 			lastActiveAt: Date.now()
 		});
+		return null;
 	}
 });
 
@@ -40,11 +46,13 @@ export const touchMcpUsage = mutation({
  */
 export const setMcpSandboxId = mutation({
 	args: {},
+	returns: v.null(),
 	handler: async (ctx) => {
 		const instance = await getAuthenticatedInstance(ctx);
 
 		await ctx.db.patch(instance._id, {
 			lastActiveAt: Date.now()
 		});
+		return null;
 	}
 });

@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -6,11 +6,23 @@ import { internalQuery, mutation, query } from './_generated/server';
 import { AnalyticsEvents } from './analyticsEvents';
 import { getAuthenticatedInstance } from './authHelpers';
 
+// Project validator
+const projectValidator = v.object({
+	_id: v.id('projects'),
+	_creationTime: v.number(),
+	instanceId: v.id('instances'),
+	name: v.string(),
+	model: v.optional(v.string()),
+	isDefault: v.boolean(),
+	createdAt: v.number()
+});
+
 /**
  * List all projects for the authenticated user's instance
  */
 export const list = query({
 	args: {},
+	returns: v.array(projectValidator),
 	handler: async (ctx) => {
 		const instance = await getAuthenticatedInstance(ctx);
 
@@ -34,6 +46,7 @@ export const list = query({
  */
 export const getByName = query({
 	args: { name: v.string() },
+	returns: v.union(v.null(), projectValidator),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 
@@ -51,6 +64,7 @@ export const getByName = query({
  */
 export const get = query({
 	args: { projectId: v.id('projects') },
+	returns: v.union(v.null(), projectValidator),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 		const project = await ctx.db.get(args.projectId);
@@ -69,6 +83,7 @@ export const get = query({
  */
 export const getDefault = query({
 	args: {},
+	returns: v.union(v.null(), projectValidator),
 	handler: async (ctx) => {
 		const instance = await getAuthenticatedInstance(ctx);
 
@@ -91,6 +106,7 @@ export const create = mutation({
 		name: v.string(),
 		model: v.optional(v.string())
 	},
+	returns: v.id('projects'),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 
@@ -103,7 +119,10 @@ export const create = mutation({
 			.first();
 
 		if (existing) {
-			throw new Error(`Project with name "${args.name}" already exists`);
+			throw new ConvexError({
+				code: 'ALREADY_EXISTS',
+				message: `Project with name "${args.name}" already exists`
+			});
 		}
 
 		const projectId = await ctx.db.insert('projects', {
@@ -135,6 +154,7 @@ export const create = mutation({
  */
 export const ensureDefault = mutation({
 	args: {},
+	returns: v.id('projects'),
 	handler: async (ctx): Promise<Id<'projects'>> => {
 		const instance = await getAuthenticatedInstance(ctx);
 
@@ -181,15 +201,17 @@ export const updateModel = mutation({
 		projectId: v.id('projects'),
 		model: v.optional(v.string())
 	},
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 		const project = await ctx.db.get(args.projectId);
 
 		if (!project || project.instanceId !== instance._id) {
-			throw new Error('Project not found');
+			throw new ConvexError({ code: 'NOT_FOUND', message: 'Project not found' });
 		}
 
 		await ctx.db.patch(args.projectId, { model: args.model });
+		return null;
 	}
 });
 
@@ -198,16 +220,17 @@ export const updateModel = mutation({
  */
 export const remove = mutation({
 	args: { projectId: v.id('projects') },
+	returns: v.null(),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 		const project = await ctx.db.get(args.projectId);
 
 		if (!project || project.instanceId !== instance._id) {
-			throw new Error('Project not found');
+			throw new ConvexError({ code: 'NOT_FOUND', message: 'Project not found' });
 		}
 
 		if (project.isDefault) {
-			throw new Error('Cannot delete the default project');
+			throw new ConvexError({ code: 'FORBIDDEN', message: 'Cannot delete the default project' });
 		}
 
 		// Delete all related threads
@@ -284,6 +307,8 @@ export const remove = mutation({
 				deletedUserResources: userResources.length
 			}
 		});
+
+		return null;
 	}
 });
 
@@ -296,6 +321,7 @@ export const getByInstanceAndName = internalQuery({
 		instanceId: v.id('instances'),
 		name: v.string()
 	},
+	returns: v.union(v.null(), projectValidator),
 	handler: async (ctx, args) => {
 		return await ctx.db
 			.query('projects')
@@ -311,6 +337,7 @@ export const getByInstanceAndName = internalQuery({
  */
 export const getDefaultByInstance = internalQuery({
 	args: { instanceId: v.id('instances') },
+	returns: v.union(v.null(), projectValidator),
 	handler: async (ctx, args) => {
 		return await ctx.db
 			.query('projects')
@@ -321,11 +348,21 @@ export const getDefaultByInstance = internalQuery({
 	}
 });
 
+// MCP question validator
+const mcpQuestionValidator = v.object({
+	_id: v.id('mcpQuestions'),
+	question: v.string(),
+	resources: v.array(v.string()),
+	answer: v.string(),
+	createdAt: v.number()
+});
+
 /**
  * List MCP questions for a project
  */
 export const listQuestions = query({
 	args: { projectId: v.id('projects') },
+	returns: v.array(mcpQuestionValidator),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 		const project = await ctx.db.get(args.projectId);

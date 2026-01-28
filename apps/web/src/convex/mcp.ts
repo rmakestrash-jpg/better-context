@@ -132,6 +132,10 @@ export const ask = action({
 		resources: v.array(v.string()),
 		project: v.optional(v.string())
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(true), text: v.string() }),
+		v.object({ ok: v.literal(false), error: v.string() })
+	),
 	handler: async (ctx, args): Promise<AskResult> => {
 		const { apiKey, question, resources, project: projectName } = args;
 
@@ -161,7 +165,7 @@ export const ask = action({
 		const availableResources: {
 			global: { name: string }[];
 			custom: { name: string }[];
-		} = await ctx.runQuery(api.resources.listAvailableInternal, { instanceId });
+		} = await ctx.runQuery(internal.resources.listAvailableInternal, { instanceId });
 		const allResourceNames: string[] = [
 			...availableResources.global.map((r: { name: string }) => r.name),
 			...availableResources.custom.map((r: { name: string }) => r.name)
@@ -264,6 +268,24 @@ export const listResources = action({
 		apiKey: v.string(),
 		project: v.optional(v.string())
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({
+			ok: v.literal(true),
+			resources: v.array(
+				v.object({
+					name: v.string(),
+					displayName: v.string(),
+					type: v.string(),
+					url: v.string(),
+					branch: v.string(),
+					searchPath: v.optional(v.string()),
+					specialNotes: v.optional(v.string()),
+					isGlobal: v.literal(false)
+				})
+			)
+		})
+	),
 	handler: async (ctx, args): Promise<ListResourcesResult> => {
 		const { apiKey } = args;
 
@@ -279,7 +301,7 @@ export const listResources = action({
 
 		// For now, resources are at instance level (backward compatible)
 		// In Phase 5, this will be updated to filter by project
-		const { custom } = await ctx.runQuery(api.resources.listAvailableInternal, { instanceId });
+		const { custom } = await ctx.runQuery(internal.resources.listAvailableInternal, { instanceId });
 
 		return { ok: true as const, resources: custom };
 	}
@@ -314,6 +336,21 @@ export const addResource = action({
 		notes: v.optional(v.string()),
 		project: v.optional(v.string())
 	},
+	returns: v.union(
+		v.object({ ok: v.literal(false), error: v.string() }),
+		v.object({
+			ok: v.literal(true),
+			resource: v.object({
+				name: v.string(),
+				displayName: v.string(),
+				type: v.string(),
+				url: v.string(),
+				branch: v.string(),
+				searchPath: v.optional(v.string()),
+				specialNotes: v.optional(v.string())
+			})
+		})
+	),
 	handler: async (ctx, args): Promise<AddResourceResult> => {
 		const {
 			apiKey,
@@ -346,10 +383,13 @@ export const addResource = action({
 			return { ok: false as const, error: 'URL must be an HTTPS URL' };
 		}
 
-		// Check if resource with this name already exists
-		const { custom } = await ctx.runQuery(api.resources.listAvailableInternal, { instanceId });
-		if (custom.some((r) => r.name.toLowerCase() === name.toLowerCase())) {
-			return { ok: false as const, error: `Resource "${name}" already exists` };
+		// Check if resource with this name already exists in this project
+		const exists = await ctx.runQuery(internal.resources.resourceExistsInProject, {
+			projectId,
+			name
+		});
+		if (exists) {
+			return { ok: false as const, error: `Resource "${name}" already exists in this project` };
 		}
 
 		// Add the resource
@@ -399,6 +439,20 @@ export const sync = action({
 		config: v.string(),
 		force: v.boolean()
 	},
+	returns: v.object({
+		ok: v.boolean(),
+		errors: v.optional(v.array(v.string())),
+		synced: v.array(v.string()),
+		conflicts: v.optional(
+			v.array(
+				v.object({
+					name: v.string(),
+					local: v.object({ url: v.string(), branch: v.string() }),
+					remote: v.object({ url: v.string(), branch: v.string() })
+				})
+			)
+		)
+	}),
 	handler: async (ctx, args): Promise<SyncResult> => {
 		const { apiKey, config: configStr, force } = args;
 
@@ -442,11 +496,19 @@ export const sync = action({
 		}
 
 		if (!config.project || typeof config.project !== 'string') {
-			return { ok: false, errors: ['Missing or invalid "project" field in config (must be a string)'], synced: [] };
+			return {
+				ok: false,
+				errors: ['Missing or invalid "project" field in config (must be a string)'],
+				synced: []
+			};
 		}
 
 		if (!Array.isArray(config.resources)) {
-			return { ok: false, errors: ['Missing or invalid "resources" field in config (must be an array)'], synced: [] };
+			return {
+				ok: false,
+				errors: ['Missing or invalid "resources" field in config (must be an array)'],
+				synced: []
+			};
 		}
 
 		const resourceErrors: string[] = [];
@@ -474,9 +536,9 @@ export const sync = action({
 		// Get or create the project
 		const projectId = await getOrCreateProject(ctx, instanceId, config.project);
 
-		// Get current resources
-		const { custom: existingResources } = await ctx.runQuery(api.resources.listAvailableInternal, {
-			instanceId
+		// Get current resources for this project
+		const existingResources = await ctx.runQuery(internal.resources.listByProject, {
+			projectId
 		});
 
 		const synced: string[] = [];
@@ -486,7 +548,8 @@ export const sync = action({
 		// Process each resource in the config
 		for (const localResource of config.resources) {
 			const existingResource = existingResources.find(
-				(r) => r.name.toLowerCase() === localResource.name.toLowerCase()
+				(r: { name: string; url: string; branch: string }) =>
+					r.name.toLowerCase() === localResource.name.toLowerCase()
 			);
 
 			if (existingResource) {

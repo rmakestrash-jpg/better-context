@@ -28,6 +28,7 @@ export const trackEvent = internalAction({
 		event: v.string(),
 		properties: v.optional(v.any())
 	},
+	returns: v.null(),
 	handler: async (_ctx, args) => {
 		const posthog = getPostHog();
 		posthog.capture({
@@ -39,6 +40,7 @@ export const trackEvent = internalAction({
 				source: 'convex'
 			}
 		});
+		return null;
 	}
 });
 
@@ -47,11 +49,13 @@ export const identifyUser = internalAction({
 		distinctId: v.string(),
 		properties: v.optional(v.any())
 	},
+	returns: v.null(),
 	handler: async (_ctx, args) => {
 		const posthog = getPostHog();
 		posthog.identify({
 			distinctId: args.distinctId,
 			properties: args.properties as Record<string, unknown> | undefined
 		});
+		return null;
 	}
 });

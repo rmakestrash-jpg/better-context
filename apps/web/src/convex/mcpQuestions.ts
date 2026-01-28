@@ -1,7 +1,18 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 
 import { query } from './_generated/server';
 import { getAuthenticatedInstance } from './authHelpers';
+
+// MCP question validator
+const mcpQuestionValidator = v.object({
+	_id: v.id('mcpQuestions'),
+	_creationTime: v.number(),
+	projectId: v.id('projects'),
+	question: v.string(),
+	resources: v.array(v.string()),
+	answer: v.string(),
+	createdAt: v.number()
+});
 
 /**
  * List MCP questions for a project.
@@ -12,6 +23,7 @@ export const list = query({
 		projectId: v.id('projects'),
 		limit: v.optional(v.number())
 	},
+	returns: v.array(mcpQuestionValidator),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 		const limit = args.limit ?? 50;
@@ -19,7 +31,7 @@ export const list = query({
 		// Verify the project belongs to this instance
 		const project = await ctx.db.get(args.projectId);
 		if (!project || project.instanceId !== instance._id) {
-			throw new Error('Project not found');
+			throw new ConvexError({ code: 'NOT_FOUND', message: 'Project not found' });
 		}
 
 		const questions = await ctx.db
@@ -40,6 +52,7 @@ export const listForDefaultProject = query({
 	args: {
 		limit: v.optional(v.number())
 	},
+	returns: v.array(mcpQuestionValidator),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 		const limit = args.limit ?? 50;
@@ -72,6 +85,7 @@ export const listForDefaultProject = query({
  */
 export const get = query({
 	args: { questionId: v.id('mcpQuestions') },
+	returns: v.union(v.null(), mcpQuestionValidator),
 	handler: async (ctx, args) => {
 		const instance = await getAuthenticatedInstance(ctx);
 

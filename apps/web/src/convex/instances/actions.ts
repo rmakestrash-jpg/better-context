@@ -112,7 +112,7 @@ async function getResourceConfigs(
 	ctx: ActionCtx,
 	instanceId: Id<'instances'>
 ): Promise<ResourceConfig[]> {
-	const resources = await ctx.runQuery(api.resources.listAvailableInternal, {
+	const resources = await ctx.runQuery(internal.resources.listAvailableInternal, {
 		instanceId
 	});
 	const merged = new Map<string, ResourceConfig>();
@@ -207,6 +207,7 @@ async function fetchLatestVersion(packageName: string): Promise<string | undefin
 
 export const provision = action({
 	args: instanceArgs,
+	returns: v.object({ sandboxId: v.string() }),
 	handler: async (ctx, args) => {
 		requireEnv('OPENCODE_API_KEY');
 
@@ -306,21 +307,32 @@ export const provision = action({
 
 export const wake = action({
 	args: instanceArgs,
+	returns: v.object({ serverUrl: v.string() }),
 	handler: async (ctx, args) => wakeInstanceInternal(ctx, args.instanceId)
 });
 
 export const stop = action({
 	args: instanceArgs,
+	returns: v.object({ stopped: v.boolean() }),
 	handler: async (ctx, args) => stopInstanceInternal(ctx, args.instanceId)
 });
 
 export const update = action({
 	args: instanceArgs,
+	returns: v.object({
+		serverUrl: v.optional(v.string()),
+		updated: v.optional(v.boolean())
+	}),
 	handler: async (ctx, args) => updateInstanceInternal(ctx, args.instanceId)
 });
 
 export const checkVersions = action({
 	args: instanceArgs,
+	returns: v.object({
+		latestBtca: v.optional(v.string()),
+		latestOpencode: v.optional(v.string()),
+		updateAvailable: v.boolean()
+	}),
 	handler: async (ctx, args) => {
 		const instance = await requireInstance(ctx, args.instanceId);
 		const [latestBtca, latestOpencode] = await Promise.all([
@@ -350,6 +362,7 @@ export const checkVersions = action({
 
 export const destroy = action({
 	args: instanceArgs,
+	returns: v.object({ destroyed: v.boolean() }),
 	handler: async (ctx, args) => {
 		const instance = await requireInstance(ctx, args.instanceId);
 		const sandboxId = instance.sandboxId;
@@ -602,6 +615,7 @@ async function updateInstanceInternal(
 
 export const wakeMyInstance = action({
 	args: {},
+	returns: v.object({ serverUrl: v.string() }),
 	handler: async (ctx): Promise<{ serverUrl: string }> => {
 		const instance = await requireAuthenticatedInstance(ctx);
 		return wakeInstanceInternal(ctx, instance._id);
@@ -615,6 +629,10 @@ type EnsureInstanceResult = {
 
 export const ensureInstanceExists = action({
 	args: { clerkId: v.optional(v.string()) },
+	returns: v.object({
+		instanceId: v.id('instances'),
+		status: v.union(v.literal('created'), v.literal('exists'), v.literal('provisioning'))
+	}),
 	handler: async (ctx, args): Promise<EnsureInstanceResult> => {
 		let clerkId = args.clerkId;
 
@@ -650,6 +668,7 @@ export const ensureInstanceExists = action({
 
 export const stopMyInstance = action({
 	args: {},
+	returns: v.object({ stopped: v.boolean() }),
 	handler: async (ctx): Promise<{ stopped: boolean }> => {
 		const instance = await requireAuthenticatedInstance(ctx);
 		return stopInstanceInternal(ctx, instance._id);
@@ -658,6 +677,10 @@ export const stopMyInstance = action({
 
 export const updateMyInstance = action({
 	args: {},
+	returns: v.object({
+		serverUrl: v.optional(v.string()),
+		updated: v.optional(v.boolean())
+	}),
 	handler: async (ctx): Promise<{ serverUrl?: string; updated?: boolean }> => {
 		const instance = await requireAuthenticatedInstance(ctx);
 		return updateInstanceInternal(ctx, instance._id);
@@ -666,6 +689,7 @@ export const updateMyInstance = action({
 
 export const resetMyInstance = action({
 	args: {},
+	returns: v.object({ reset: v.boolean() }),
 	handler: async (ctx): Promise<{ reset: boolean }> => {
 		const instance = await requireAuthenticatedInstance(ctx);
 		const sandboxId = instance.sandboxId;
@@ -713,6 +737,7 @@ export const resetMyInstance = action({
 
 export const syncResources = internalAction({
 	args: instanceArgs,
+	returns: v.object({ synced: v.boolean() }),
 	handler: async (ctx, args): Promise<{ synced: boolean }> => {
 		const instance = await requireInstance(ctx, args.instanceId);
 		if (!instance.sandboxId || instance.state !== 'running') {
@@ -808,6 +833,20 @@ async function getSandboxStatus(sandbox: Sandbox): Promise<SyncResult> {
 
 export const syncSandboxStatus = internalAction({
 	args: instanceArgs,
+	returns: v.union(
+		v.object({
+			storageUsedBytes: v.number(),
+			cachedResources: v.array(
+				v.object({
+					name: v.string(),
+					url: v.string(),
+					branch: v.string(),
+					sizeBytes: v.optional(v.number())
+				})
+			)
+		}),
+		v.null()
+	),
 	handler: async (ctx, args): Promise<SyncResult | null> => {
 		const instance = await requireInstance(ctx, args.instanceId);
 		if (!instance.sandboxId) {
