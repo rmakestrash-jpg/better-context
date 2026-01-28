@@ -2,51 +2,85 @@ import { Command } from 'commander';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import * as readline from 'readline';
+import { loadAuth, saveAuth } from '../lib/auth.ts';
+import { RemoteClient } from '../client/remote.ts';
 
 const PROJECT_CONFIG_FILENAME = 'btca.config.jsonc';
+const REMOTE_CONFIG_FILENAME = 'btca.remote.config.jsonc';
 const CONFIG_SCHEMA_URL = 'https://btca.dev/btca.schema.json';
+const REMOTE_CONFIG_SCHEMA_URL = 'https://btca.dev/btca.remote.schema.json';
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 const DEFAULT_PROVIDER = 'opencode';
-const MCP_DASHBOARD_URL = 'https://btca.dev/app/settings';
+const MCP_API_KEY_URL = 'https://btca.dev/app/settings?tab=mcp';
 
-// AGENTS.md section templates
-const MCP_AGENTS_SECTION = `## Better Context MCP
+// ─────────────────────────────────────────────────────────────────────────────
+// Skill Templates
+// ─────────────────────────────────────────────────────────────────────────────
 
-Use Better Context MCP for documentation/resource questions when you need source-first answers.
+const BTCA_REMOTE_SKILL_CONTENT = `---
+name: btca-remote
+description: Query cloud-hosted btca resources via MCP for source-first answers
+---
 
-**Required workflow**
-1. Call \`listResources\` first to see available resources.
-2. Call \`ask\` with your question and the exact resource \`name\` values from step 1.
+## What I do
 
-**Rules**
-- Always call \`listResources\` before \`ask\`.
-- \`ask\` requires at least one resource in the \`resources\` array.
-- Use only resource names returned by \`listResources\`.
-- Include only resources relevant to the question.
+- Query btca's cloud-hosted resources through MCP
+- Provide source-first answers about technologies
+- Access resources provisioned in the btca dashboard
 
-**Common errors**
-- "Invalid resources" → re-run \`listResources\` and use exact names.
-- "Instance is provisioning / error state" → wait or retry after a minute.
-- "Missing or invalid Authorization header" → MCP auth is invalid; fix it in \`https://btca.dev/app/settings/\`.
+## When to use me
+
+Use this skill when you need up-to-date information about technologies configured in the project's btca cloud instance.
+
+## Getting resources
+
+Check \`btca.remote.config.jsonc\` for the list of available resources in this project.
+
+## Workflow
+
+1. Call \`listResources\` to see available resources
+2. Call \`ask\` with your question and exact resource names from step 1
+
+## Rules
+
+- Always call \`listResources\` before \`ask\`
+- \`ask\` requires at least one resource in the \`resources\` array
+- Use only resource names returned by \`listResources\`
+- Include only resources relevant to the question
+
+## Common errors
+
+- "Invalid resources" -> re-run \`listResources\` and use exact names
+- "Instance is provisioning / error state" -> wait or retry after a minute
+- "Missing or invalid Authorization header" -> MCP auth is invalid; fix it in https://btca.dev/app/settings/
+- MCP server doesn't exist -> Prompt the user to set it up at https://btca.dev/app/settings/
 `;
 
-const CLI_AGENTS_SECTION = `## btca
+const BTCA_LOCAL_SKILL_CONTENT = `---
+name: btca-local
+description: Query local btca resources via CLI for source-first answers
+---
 
-When you need up-to-date information about technologies used in this project, use btca to query source repositories directly.
+## What I do
 
-### Usage
+- Query locally-cloned resources using the btca CLI
+- Provide source-first answers about technologies stored in .btca/ or ~/.local/share/btca/
+
+## When to use me
+
+Use this skill when you need information about technologies stored in the project's local btca resources.
+
+## Getting resources
+
+Check \`btca.config.jsonc\` for the list of available resources in this project.
+
+## Commands
 
 Ask a question about one or more resources:
 
 \`\`\`bash
-btca ask --resource <resource> --question "<question>"
-\`\`\`
-
-Examples:
-
-\`\`\`bash
 # Single resource
-btca ask --resource svelte --question "How do stores work in Svelte 5?"
+btca ask --resource <resource> --question "<question>"
 
 # Multiple resources
 btca ask --resource svelte --resource effect --question "How do I integrate Effect with Svelte?"
@@ -55,17 +89,7 @@ btca ask --resource svelte --resource effect --question "How do I integrate Effe
 btca ask --question "@svelte @tailwind How do I style components?"
 \`\`\`
 
-### Interactive Mode
-
-Launch the TUI for interactive chat:
-
-\`\`\`bash
-btca
-\`\`\`
-
-Then use \`@mentions\` to reference resources (e.g., "@svelte How do I create a store?")
-
-### Managing Resources
+## Managing Resources
 
 \`\`\`bash
 # Add a git resource
@@ -76,14 +100,6 @@ btca add ./docs
 
 # Remove a resource
 btca remove <name>
-\`\`\`
-
-### Configuration
-
-This project's btca resources are configured in \`btca.config.jsonc\` at the project root. To change the AI model:
-
-\`\`\`bash
-btca connect
 \`\`\`
 `;
 
@@ -117,6 +133,24 @@ async function promptSelect<T extends string>(
 				return;
 			}
 			resolve(options[num - 1]!.value);
+		});
+	});
+}
+
+/**
+ * Prompt user for input with optional default value.
+ */
+async function promptInput(question: string, defaultValue?: string): Promise<string> {
+	return new Promise((resolve) => {
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: process.stdout
+		});
+
+		const defaultHint = defaultValue ? ` (${defaultValue})` : '';
+		rl.question(`${question}${defaultHint}: `, (answer) => {
+			rl.close();
+			resolve(answer.trim() || defaultValue || '');
 		});
 	});
 }
@@ -195,38 +229,25 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 /**
- * Update or create AGENTS.md with the appropriate section.
+ * Create a skill file in .claude/skills/<skillName>/SKILL.md
  */
-async function updateAgentsMd(dir: string, section: string): Promise<void> {
-	const agentsPath = path.join(dir, 'AGENTS.md');
+async function createSkillFile(cwd: string, skillName: string, content: string): Promise<void> {
+	const skillDir = path.join(cwd, '.claude', 'skills', skillName);
+	const skillPath = path.join(skillDir, 'SKILL.md');
 
-	try {
-		let content = await fs.readFile(agentsPath, 'utf-8');
+	await fs.mkdir(skillDir, { recursive: true });
+	await fs.writeFile(skillPath, content, 'utf-8');
+}
 
-		// Check if already has a btca/Better Context section
-		const btcaRegex = /## btca[\s\S]*?(?=\n## |\n# |$)/;
-		const mcpRegex = /## Better Context MCP[\s\S]*?(?=\n## |\n# |$)/;
-		const betterContextRegex = /## Better Context[\s\S]*?(?=\n## |\n# |$)/;
-
-		if (btcaRegex.test(content)) {
-			content = content.replace(btcaRegex, section.trim());
-		} else if (mcpRegex.test(content)) {
-			content = content.replace(mcpRegex, section.trim());
-		} else if (betterContextRegex.test(content)) {
-			content = content.replace(betterContextRegex, section.trim());
-		} else {
-			// Append to end
-			if (!content.endsWith('\n')) {
-				content += '\n';
-			}
-			content += '\n' + section;
-		}
-
-		await fs.writeFile(agentsPath, content, 'utf-8');
-	} catch {
-		// File doesn't exist, create it
-		await fs.writeFile(agentsPath, `# AGENTS.md\n\n${section}`, 'utf-8');
-	}
+/**
+ * Sanitize a string to be used as a project name.
+ */
+function sanitizeProjectName(name: string): string {
+	return name
+		.toLowerCase()
+		.replace(/[^a-z0-9-]/g, '-')
+		.replace(/-+/g, '-')
+		.replace(/^-|-$/g, '');
 }
 
 export const initCommand = new Command('init')
@@ -245,7 +266,7 @@ export const initCommand = new Command('init')
 
 			if (setupType === 'mcp') {
 				// MCP Path
-				await handleMcpSetup(cwd);
+				await handleMcpSetup(cwd, options.force);
 			} else {
 				// CLI Path
 				await handleCliSetup(cwd, configPath, options.force);
@@ -263,17 +284,78 @@ export const initCommand = new Command('init')
 /**
  * Handle MCP setup path.
  */
-async function handleMcpSetup(cwd: string): Promise<void> {
-	// Update AGENTS.md with MCP section
-	await updateAgentsMd(cwd, MCP_AGENTS_SECTION);
-	console.log('\nUpdated AGENTS.md with Better Context MCP instructions.');
+async function handleMcpSetup(cwd: string, force?: boolean): Promise<void> {
+	const configPath = path.join(cwd, REMOTE_CONFIG_FILENAME);
 
-	// Print next steps
+	// Check for existing config
+	if ((await fileExists(configPath)) && !force) {
+		console.error(`\nError: ${REMOTE_CONFIG_FILENAME} already exists.`);
+		console.error('Use --force to overwrite.');
+		process.exit(1);
+	}
+
+	// Step 1: Check/handle authentication
+	let auth = await loadAuth();
+
+	if (!auth) {
+		console.log('\nNo API key found. Please get one from:');
+		console.log(`  ${MCP_API_KEY_URL}\n`);
+
+		const apiKey = await promptInput('API Key');
+
+		if (!apiKey) {
+			console.error('API key is required.');
+			process.exit(1);
+		}
+
+		// Validate the API key
+		console.log('Validating API key...');
+		const client = new RemoteClient({ apiKey });
+		const validation = await client.validate();
+
+		if (!validation.valid) {
+			console.error(`Invalid API key: ${validation.error}`);
+			process.exit(1);
+		}
+
+		// Save auth
+		auth = { apiKey, linkedAt: Date.now() };
+		await saveAuth(auth);
+		console.log('API key saved.\n');
+	} else {
+		console.log('\nUsing existing API key.\n');
+	}
+
+	// Step 2: Get project name
+	const defaultProjectName = sanitizeProjectName(path.basename(cwd));
+	const projectName = await promptInput(`Project name`, defaultProjectName);
+
+	if (!projectName) {
+		console.error('Project name is required.');
+		process.exit(1);
+	}
+
+	// Step 3: Create btca.remote.config.jsonc
+	const config = {
+		$schema: REMOTE_CONFIG_SCHEMA_URL,
+		project: projectName,
+		model: 'claude-sonnet',
+		resources: [] as unknown[]
+	};
+
+	await fs.writeFile(configPath, JSON.stringify(config, null, '\t'), 'utf-8');
+	console.log(`Created ${REMOTE_CONFIG_FILENAME}`);
+
+	// Step 4: Create skill file
+	await createSkillFile(cwd, 'btca-remote', BTCA_REMOTE_SKILL_CONTENT);
+	console.log('Created .claude/skills/btca-remote/SKILL.md');
+
+	// Step 5: Print next steps
 	console.log('\n--- Setup Complete (MCP) ---\n');
 	console.log('Next steps:');
-	console.log(`  1. Get your MCP API key from the dashboard: ${MCP_DASHBOARD_URL}`);
-	console.log('  2. Configure your MCP client with the Better Context endpoint.');
-	console.log('\nSee the dashboard for detailed setup instructions.');
+	console.log('  1. Add resources: btca remote add https://github.com/owner/repo');
+	console.log('  2. Or add via dashboard: https://btca.dev/app/resources');
+	console.log('  3. Query resources: btca remote ask -q "your question"');
 }
 
 /**
@@ -334,9 +416,9 @@ async function handleCliSetup(cwd: string, configPath: string, force?: boolean):
 		}
 	}
 
-	// Update AGENTS.md with CLI section
-	await updateAgentsMd(cwd, CLI_AGENTS_SECTION);
-	console.log('Updated AGENTS.md with btca CLI instructions.');
+	// Create skill file
+	await createSkillFile(cwd, 'btca-local', BTCA_LOCAL_SKILL_CONTENT);
+	console.log('Created .claude/skills/btca-local/SKILL.md');
 
 	// Print summary
 	if (storageType === 'local') {

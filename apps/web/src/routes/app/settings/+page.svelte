@@ -217,7 +217,9 @@
   --header "Authorization: Bearer ${apiKey}"`;
 		}
 	};
-	const modalConfig = $derived(newlyCreatedKey ? getConfigWithKey(modalSelectedTool, newlyCreatedKey) : '');
+	const modalConfig = $derived(
+		newlyCreatedKey ? getConfigWithKey(modalSelectedTool, newlyCreatedKey) : ''
+	);
 
 	const agentInstructions = `## Better Context MCP
 
@@ -524,8 +526,7 @@ Use the Better Context MCP for documentation questions.
 											<th class="bc-muted px-4 py-3 text-left text-xs font-medium uppercase"
 												>Name</th
 											>
-											<th class="bc-muted px-4 py-3 text-left text-xs font-medium uppercase">ID</th
-											>
+											<th class="bc-muted px-4 py-3 text-left text-xs font-medium uppercase">ID</th>
 											<th class="bc-muted px-4 py-3 text-left text-xs font-medium uppercase"
 												>Created</th
 											>
@@ -837,7 +838,8 @@ Use the Better Context MCP for documentation questions.
 									rootStyle: 'background-color: transparent; padding: 0; margin: 0;'
 								})}
 							{:else}
-								<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{modalConfig}</code></pre>
+								<pre class="m-0 whitespace-pre text-sm leading-relaxed"><code>{modalConfig}</code
+									></pre>
 							{/if}
 						</div>
 						<CopyButton text={modalConfig} label="Copy configuration" />
@@ -848,7 +850,9 @@ Use the Better Context MCP for documentation questions.
 					{#if modalSelectedTool === 'claude-code'}
 						Run this command in your terminal.
 					{:else}
-						Add this to <code class="rounded bg-[hsl(var(--bc-bg-secondary))] px-1">{toolConfigs[modalSelectedTool].filename}</code>
+						Add this to <code class="rounded bg-[hsl(var(--bc-bg-secondary))] px-1"
+							>{toolConfigs[modalSelectedTool].filename}</code
+						>
 					{/if}
 				</p>
 

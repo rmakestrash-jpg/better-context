@@ -119,7 +119,8 @@ export default defineSchema({
 	})
 		.index('by_instance', ['instanceId'])
 		.index('by_project', ['projectId'])
-		.index('by_instance_and_name', ['instanceId', 'name']),
+		.index('by_instance_and_name', ['instanceId', 'name'])
+		.index('by_project_and_name', ['projectId', 'name']),
 
 	threads: defineTable({
 		instanceId: v.id('instances'),

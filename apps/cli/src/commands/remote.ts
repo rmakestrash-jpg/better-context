@@ -6,63 +6,15 @@ import {
 	type GitResource,
 	type RemoteConfig
 } from '../client/remote.ts';
+import { loadAuth, saveAuth, deleteAuth, type RemoteAuth } from '../lib/auth.ts';
 import { dim, green, red, yellow, bold } from '../lib/utils/colors.ts';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Config Constants (duplicated to avoid server import)
+// Config Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GLOBAL_CONFIG_DIR = '~/.config/btca';
-const REMOTE_AUTH_FILENAME = 'remote-auth.json';
 const REMOTE_CONFIG_FILENAME = 'btca.remote.config.jsonc';
 const REMOTE_CONFIG_SCHEMA_URL = 'https://btca.dev/btca.remote.schema.json';
-
-const expandHome = (filePath: string): string => {
-	const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
-	if (filePath.startsWith('~/')) return home + filePath.slice(1);
-	return filePath;
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Auth Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface RemoteAuth {
-	apiKey: string;
-	linkedAt: number;
-}
-
-async function getAuthPath(): Promise<string> {
-	return `${expandHome(GLOBAL_CONFIG_DIR)}/${REMOTE_AUTH_FILENAME}`;
-}
-
-async function loadAuth(): Promise<RemoteAuth | null> {
-	const authPath = await getAuthPath();
-	try {
-		const content = await Bun.file(authPath).text();
-		return JSON.parse(content) as RemoteAuth;
-	} catch {
-		return null;
-	}
-}
-
-async function saveAuth(auth: RemoteAuth): Promise<void> {
-	const authPath = await getAuthPath();
-	const configDir = authPath.slice(0, authPath.lastIndexOf('/'));
-
-	await Bun.write(`${configDir}/.keep`, '');
-	await Bun.write(authPath, JSON.stringify(auth, null, 2));
-}
-
-async function deleteAuth(): Promise<void> {
-	const authPath = await getAuthPath();
-	try {
-		const fs = await import('node:fs/promises');
-		await fs.unlink(authPath);
-	} catch {
-		// Ignore if file doesn't exist
-	}
-}
 
 async function requireAuth(): Promise<RemoteClient> {
 	const auth = await loadAuth();
@@ -503,7 +455,7 @@ async function addRemoteResourceWizard(url: string): Promise<void> {
 
 		if (!config) {
 			const projectRl = createRl();
-			const projectName = await promptInput(projectRl, 'Project name for remote config');
+			const projectName = await promptInput(projectRl, 'Project name for remote config', 'default');
 			projectRl.close();
 
 			if (!projectName) {
@@ -606,7 +558,7 @@ const addCommand = new Command('add')
 
 					if (!config) {
 						const rl = createRl();
-						const projectName = await promptInput(rl, 'Project name for remote config');
+						const projectName = await promptInput(rl, 'Project name for remote config', 'default');
 						rl.close();
 
 						if (!projectName) {
@@ -845,7 +797,7 @@ const initCommand = new Command('init')
 
 			if (!projectName) {
 				const rl = createRl();
-				projectName = await promptInput(rl, 'Project name');
+				projectName = await promptInput(rl, 'Project name', 'default');
 				rl.close();
 			}
 

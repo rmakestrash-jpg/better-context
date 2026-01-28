@@ -383,10 +383,13 @@ export const addResource = action({
 			return { ok: false as const, error: 'URL must be an HTTPS URL' };
 		}
 
-		// Check if resource with this name already exists
-		const { custom } = await ctx.runQuery(internal.resources.listAvailableInternal, { instanceId });
-		if (custom.some((r: { name: string }) => r.name.toLowerCase() === name.toLowerCase())) {
-			return { ok: false as const, error: `Resource "${name}" already exists` };
+		// Check if resource with this name already exists in this project
+		const exists = await ctx.runQuery(internal.resources.resourceExistsInProject, {
+			projectId,
+			name
+		});
+		if (exists) {
+			return { ok: false as const, error: `Resource "${name}" already exists in this project` };
 		}
 
 		// Add the resource
@@ -533,13 +536,10 @@ export const sync = action({
 		// Get or create the project
 		const projectId = await getOrCreateProject(ctx, instanceId, config.project);
 
-		// Get current resources
-		const { custom: existingResources } = await ctx.runQuery(
-			internal.resources.listAvailableInternal,
-			{
-				instanceId
-			}
-		);
+		// Get current resources for this project
+		const existingResources = await ctx.runQuery(internal.resources.listByProject, {
+			projectId
+		});
 
 		const synced: string[] = [];
 		const errors: string[] = [];

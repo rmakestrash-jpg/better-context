@@ -144,6 +144,41 @@ export const listAvailable = query({
 });
 
 /**
+ * Check if a resource name exists within a specific project (case-insensitive)
+ */
+export const resourceExistsInProject = internalQuery({
+	args: {
+		projectId: v.id('projects'),
+		name: v.string()
+	},
+	returns: v.boolean(),
+	handler: async (ctx, args) => {
+		const projectResources = await ctx.db
+			.query('userResources')
+			.withIndex('by_project', (q) => q.eq('projectId', args.projectId))
+			.collect();
+
+		return projectResources.some((r) => r.name.toLowerCase() === args.name.toLowerCase());
+	}
+});
+
+/**
+ * List resources for a specific project (internal)
+ */
+export const listByProject = internalQuery({
+	args: {
+		projectId: v.id('projects')
+	},
+	returns: v.array(userResourceValidator),
+	handler: async (ctx, args) => {
+		return await ctx.db
+			.query('userResources')
+			.withIndex('by_project', (q) => q.eq('projectId', args.projectId))
+			.collect();
+	}
+});
+
+/**
  * Internal version that accepts instanceId (for use by internal actions only)
  * This is needed for server-side operations that run without user auth context
  */

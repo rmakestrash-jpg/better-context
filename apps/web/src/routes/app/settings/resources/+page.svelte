@@ -1,6 +1,17 @@
 <script lang="ts">
 	import { GLOBAL_RESOURCES, type GlobalResource } from '@btca/shared';
-	import { Loader2, Plus, Trash2, Globe, User, ExternalLink, Link, Check, X } from '@lucide/svelte';
+	import {
+		Loader2,
+		Plus,
+		Trash2,
+		Globe,
+		User,
+		ExternalLink,
+		Link,
+		Check,
+		X,
+		Layers
+	} from '@lucide/svelte';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import { goto } from '$app/navigation';
 	import ResourceLogo from '$lib/components/ResourceLogo.svelte';
@@ -12,12 +23,15 @@
 	const client = useConvexClient();
 	const projectStore = getProjectStore();
 
+	// State for showing all projects toggle
+	let showAllProjects = $state(false);
+
 	const selectedProjectId = $derived(projectStore.selectedProject?._id);
 	const userResourcesQuery = $derived(
 		auth.instanceId
 			? useQuery(
 					api.resources.listUserResources,
-					selectedProjectId ? { projectId: selectedProjectId } : {}
+					showAllProjects ? {} : selectedProjectId ? { projectId: selectedProjectId } : {}
 				)
 			: null
 	);
@@ -242,14 +256,21 @@
 					<User size={18} />
 					<h2 class="text-lg font-medium">Your Custom Resources</h2>
 				</div>
-				<button
-					type="button"
-					class="bc-btn bc-btn-primary text-sm"
-					onclick={() => (showAddForm = !showAddForm)}
-				>
-					<Plus size={16} />
-					Add Manually
-				</button>
+				<div class="flex items-center gap-3">
+					<label class="flex items-center gap-2 text-sm cursor-pointer">
+						<input type="checkbox" class="bc-checkbox" bind:checked={showAllProjects} />
+						<Layers size={14} class="bc-muted" />
+						<span class="bc-muted">All Projects</span>
+					</label>
+					<button
+						type="button"
+						class="bc-btn bc-btn-primary text-sm"
+						onclick={() => (showAddForm = !showAddForm)}
+					>
+						<Plus size={16} />
+						Add Manually
+					</button>
+				</div>
 			</div>
 			<p class="bc-muted mb-4 text-sm">Add your own git repositories as documentation resources.</p>
 
@@ -612,5 +633,30 @@
 
 	.bc-input::placeholder {
 		color: hsl(var(--bc-fg-muted) / 0.35);
+	}
+
+	.bc-checkbox {
+		appearance: none;
+		width: 1rem;
+		height: 1rem;
+		background: hsl(var(--bc-surface));
+		border: 1px solid hsl(var(--bc-border));
+		border-radius: 0.25rem;
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.bc-checkbox:checked {
+		background: hsl(var(--bc-accent));
+		border-color: hsl(var(--bc-accent));
+		background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+		background-size: 100% 100%;
+		background-position: center;
+		background-repeat: no-repeat;
+	}
+
+	.bc-checkbox:focus {
+		outline: none;
+		box-shadow: 0 0 0 2px hsl(var(--bc-accent) / 0.3);
 	}
 </style>
