@@ -387,31 +387,6 @@ export namespace Agent {
 				hint: 'BTCA uses virtual collections only. Use the btca ask/stream APIs instead.',
 				cause: new Error('Virtual collections are not compatible with filesystem-based OpenCode')
 			});
-			const ocConfig = buildOpenCodeConfig({
-				agentInstructions: collection.agentInstructions,
-				providerId: config.provider,
-				providerTimeoutMs: config.providerTimeoutMs
-			});
-			const { server, baseUrl } = await createOpencodeInstance({
-				collectionPath: collection.path,
-				ocConfig
-			});
-
-			// Register the instance for lifecycle management
-			const instanceId = generateInstanceId();
-			registerInstance(instanceId, server, collection.path);
-
-			Metrics.info('agent.oc.instance.ready', {
-				baseUrl,
-				collectionPath: collection.path,
-				instanceId
-			});
-
-			return {
-				url: baseUrl,
-				model: { provider: config.provider, model: config.model },
-				instanceId
-			};
 		};
 
 		/**
