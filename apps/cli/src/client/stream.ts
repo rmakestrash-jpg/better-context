@@ -1,3 +1,4 @@
+import { Result } from 'better-result';
 import { BtcaStreamEventSchema, type BtcaStreamEvent } from 'btca-server/stream/types';
 
 /**
@@ -33,12 +34,14 @@ export async function* parseSSEStream(response: Response): AsyncGenerator<BtcaSt
 					eventData = line.slice(6);
 				} else if (line === '' && eventData) {
 					// Empty line = end of event
-					try {
-						const parsed = JSON.parse(eventData) as unknown;
-						const validated = BtcaStreamEventSchema.parse(parsed);
-						yield validated;
-					} catch (error) {
-						console.error('Failed to parse SSE event:', error);
+					const parsed = Result.try(() => JSON.parse(eventData));
+					const validated = parsed.andThen((value) =>
+						Result.try(() => BtcaStreamEventSchema.parse(value))
+					);
+					if (Result.isOk(validated)) {
+						yield validated.value;
+					} else {
+						console.error('Failed to parse SSE event:', validated.error);
 					}
 					eventType = '';
 					eventData = '';
@@ -58,12 +61,12 @@ export async function* parseSSEStream(response: Response): AsyncGenerator<BtcaSt
 			}
 
 			if (eventData) {
-				try {
-					const parsed = JSON.parse(eventData) as unknown;
-					const validated = BtcaStreamEventSchema.parse(parsed);
-					yield validated;
-				} catch {
-					// Ignore incomplete final event
+				const parsed = Result.try(() => JSON.parse(eventData));
+				const validated = parsed.andThen((value) =>
+					Result.try(() => BtcaStreamEventSchema.parse(value))
+				);
+				if (Result.isOk(validated)) {
+					yield validated.value;
 				}
 			}
 		}

@@ -25,6 +25,9 @@
       "bin": {
         "btca": "bin.js",
       },
+      "dependencies": {
+        "better-result": "^2.6.0",
+      },
       "devDependencies": {
         "@btca/shared": "workspace:*",
         "@opentui/core": "0.1.65",
