@@ -7,10 +7,13 @@ import type { LanguageModel } from 'ai';
 import { Auth } from './auth.ts';
 import {
 	getProviderFactory,
+	getProviderFactoryAsync,
 	isProviderSupported,
+	isProviderSupportedAsync,
 	normalizeProviderId,
 	type ProviderOptions
 } from './registry.ts';
+import { getCustomProviderApiKey, isCustomProvider } from './opencode-config.ts';
 
 export namespace Model {
 	export class ProviderNotFoundError extends Error {
@@ -61,13 +64,14 @@ export namespace Model {
 	): Promise<LanguageModel> {
 		const normalizedProviderId = normalizeProviderId(providerId);
 
-		// Check if provider is supported
-		if (!isProviderSupported(normalizedProviderId)) {
+		// Check if provider is supported (including custom providers)
+		const isSupported = await isProviderSupportedAsync(normalizedProviderId);
+		if (!isSupported) {
 			throw new ProviderNotFoundError(providerId);
 		}
 
-		// Get the provider factory
-		const factory = getProviderFactory(normalizedProviderId);
+		// Get the provider factory (including custom providers)
+		const factory = await getProviderFactoryAsync(normalizedProviderId);
 		if (!factory) {
 			throw new ProviderNotFoundError(providerId);
 		}
@@ -80,9 +84,16 @@ export namespace Model {
 			if (normalizedProviderId === 'opencode') {
 				apiKey = process.env.OPENCODE_API_KEY || (await Auth.getApiKey(normalizedProviderId));
 			} else {
-				apiKey = await Auth.getApiKey(normalizedProviderId);
-				if (!apiKey) {
-					throw new ProviderNotAuthenticatedError(providerId);
+				// First check if this is a custom provider with apiKey in config
+				const customApiKey = await getCustomProviderApiKey(normalizedProviderId);
+				if (customApiKey) {
+					apiKey = customApiKey;
+				} else {
+					// Fall back to OpenCode auth.json
+					apiKey = await Auth.getApiKey(normalizedProviderId);
+					if (!apiKey) {
+						throw new ProviderNotAuthenticatedError(providerId);
+					}
 				}
 			}
 		}

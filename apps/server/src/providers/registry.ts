@@ -21,6 +21,7 @@ import { createXai } from '@ai-sdk/xai';
 import { createCursor } from './cursor.ts';
 import { createOpenCodeZen } from './opencode.ts';
 import { createOpenRouter } from './openrouter.ts';
+import { getCustomProviders, isCustomProvider } from './opencode-config.ts';
 
 // Type for provider factory options
 export type ProviderOptions = {
@@ -88,11 +89,23 @@ export const PROVIDER_ALIASES: Record<string, string> = {
 };
 
 /**
- * Check if a provider is supported
+ * Check if a provider is supported (sync version for built-in providers only)
  */
 export function isProviderSupported(providerId: string): boolean {
 	const normalized = PROVIDER_ALIASES[providerId] || providerId;
 	return normalized in PROVIDER_REGISTRY;
+}
+
+/**
+ * Check if a provider is supported (async version that includes custom providers)
+ */
+export async function isProviderSupportedAsync(providerId: string): Promise<boolean> {
+	const normalized = PROVIDER_ALIASES[providerId] || providerId;
+	if (normalized in PROVIDER_REGISTRY) {
+		return true;
+	}
+	// Check custom providers from OpenCode config
+	return isCustomProvider(normalized);
 }
 
 /**
@@ -103,7 +116,7 @@ export function normalizeProviderId(providerId: string): string {
 }
 
 /**
- * Get a provider factory by ID
+ * Get a provider factory by ID (sync version for built-in providers only)
  */
 export function getProviderFactory(providerId: string): ProviderFactory | undefined {
 	const normalized = normalizeProviderId(providerId);
@@ -111,8 +124,32 @@ export function getProviderFactory(providerId: string): ProviderFactory | undefi
 }
 
 /**
- * Get all supported provider IDs
+ * Get a provider factory by ID (async version that includes custom providers)
+ */
+export async function getProviderFactoryAsync(providerId: string): Promise<ProviderFactory | undefined> {
+	const normalized = normalizeProviderId(providerId);
+	
+	// Check built-in providers first
+	if (normalized in PROVIDER_REGISTRY) {
+		return PROVIDER_REGISTRY[normalized];
+	}
+	
+	// Check custom providers from OpenCode config
+	const customProviders = await getCustomProviders();
+	return customProviders.get(normalized);
+}
+
+/**
+ * Get all supported provider IDs (sync version for built-in providers only)
  */
 export function getSupportedProviders(): string[] {
 	return Object.keys(PROVIDER_REGISTRY);
+}
+
+/**
+ * Get all supported provider IDs (async version that includes custom providers)
+ */
+export async function getSupportedProvidersAsync(): Promise<string[]> {
+	const customProviders = await getCustomProviders();
+	return [...Object.keys(PROVIDER_REGISTRY), ...customProviders.keys()];
 }

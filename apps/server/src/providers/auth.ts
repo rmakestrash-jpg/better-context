@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { z } from 'zod';
 import { Result } from 'better-result';
+import { getCustomProviderApiKey, isCustomProvider, getCustomProviders } from './opencode-config.ts';
 
 export namespace Auth {
 	const getOpenRouterApiKey = () => {
@@ -117,6 +118,11 @@ export namespace Auth {
 	export async function isAuthenticated(providerId: string): Promise<boolean> {
 		if (providerId === 'openrouter' && getOpenRouterApiKey()) return true;
 		if (providerId === 'cursor' && getCursorApiKey()) return true;
+		
+		// Check if this is a custom provider with apiKey in config
+		const customApiKey = await getCustomProviderApiKey(providerId);
+		if (customApiKey) return true;
+		
 		const auth = await getCredentials(providerId);
 		return auth !== undefined;
 	}
@@ -134,6 +140,10 @@ export namespace Auth {
 			const envKey = getCursorApiKey();
 			if (envKey) return envKey;
 		}
+
+		// Check if this is a custom provider with apiKey in opencode config
+		const customApiKey = await getCustomProviderApiKey(providerId);
+		if (customApiKey) return customApiKey;
 
 		const auth = await getCredentials(providerId);
 		if (!auth) return undefined;
@@ -172,6 +182,15 @@ export namespace Auth {
 		}
 		if (authData['openrouter.ai'] || authData['openrouter-ai']) {
 			providers.add('openrouter');
+		}
+
+		// Add custom providers that have apiKey in their config
+		const customProviders = await getCustomProviders();
+		for (const providerId of customProviders.keys()) {
+			const apiKey = await getCustomProviderApiKey(providerId);
+			if (apiKey) {
+				providers.add(providerId);
+			}
 		}
 
 		return Array.from(providers);
